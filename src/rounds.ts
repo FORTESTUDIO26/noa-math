@@ -5,7 +5,7 @@ import { generate } from './generators';
 import { validateQuestion } from './validate';
 import { TOPICS } from './topics';
 import { checkPart } from './answers';
-import { familyRound, placeQuestion, type PlaceType } from './generators/place';
+import { familyRound, placeQuestion, fixedPositionClash, type PlaceType } from './generators/place';
 
 export interface TopicStats { seen: number; firstTry: number; wrong: number }
 export type Stats = Partial<Record<TopicId, TopicStats>>;
@@ -37,24 +37,44 @@ export function buildTopicRound(rng: Rng, topic: TopicId, recent: string[]): Que
     }
     return spreadChoiceAnswers(rng, best);
   }
-  return spreadChoiceAnswers(rng, CONFIG.topicRoundLevels.map((lv) => freshQuestion(rng, topic, lv, avoid)));
+  const levels = CONFIG.topicRoundLevels;
+  const qs = levels.map((lv) => freshQuestion(rng, topic, lv, avoid));
+  return spreadChoiceAnswers(rng, avoidFixedClash(qs, (i) => freshQuestion(rng, topic, levels[i], avoid)));
 }
 
-/** The correct button should not sit in the same position in two choice questions in a row. */
+/**
+ * The correct button should not sit in the same position in two choice questions in a row.
+ * Shuffleable options are reshuffled; fixed-order lists (place names, angle types …) keep their
+ * order – the round builders regenerate such a question instead (see avoidFixedClash).
+ */
 export function spreadChoiceAnswers(rng: Rng, qs: Question[]): Question[] {
   let last = '';
-  for (const q of qs) {
-    for (const p of q.parts) {
-      if (p.kind !== 'choice' || !p.choices || p.choices.some((c) => !c.isFigure && /^(אלפים|מאות|עשרות|יחידות|זוגי|אי־זוגי|חדה|ישרה|קהה|שטוחה|שווה־צלעות|שווה־שוקיים|שונה־צלעות|משולש|מרובע|מחומש|משושה|משובע|מתומן)$/.test(c.text))) continue; // fixed-order name lists stay in order
-      for (let k = 0; k < 6 && p.answer === last; k++) {
-        const cs: Choice[] = p.choices;
-        const correctText = cs.find((c) => c.id === p.answer)!.text;
-        const next: Choice[] = rng.shuffle(cs).map((c, i) => ({ ...c, id: 'abcdefgh'[i] }));
-        p.choices = next;
-        p.answer = next.find((c) => c.text === correctText)!.id;
+  qs.forEach((q, qi) => {
+    q.parts.forEach((p, pi) => {
+      if (p.kind !== 'choice' || !p.choices) { last = ''; return; }
+      // a fixed-order list right after this one cannot move, so steer clear of its position too
+      const nq = pi === q.parts.length - 1 ? qs[qi + 1] : undefined;
+      const np = nq?.parts[0];
+      const nextFixed = np && np.kind === 'choice' && np.fixedOrder ? np.answer : '';
+      if (!p.fixedOrder) {
+        for (let k = 0; k < 12 && (p.answer === last || p.answer === nextFixed); k++) {
+          const cs: Choice[] = p.choices;
+          const correctText = cs.find((c) => c.id === p.answer)!.text;
+          const next: Choice[] = rng.shuffle(cs).map((c, i) => ({ ...c, id: 'abcdefgh'[i] }));
+          p.choices = next;
+          p.answer = next.find((c) => c.text === correctText)!.id;
+        }
       }
       last = p.answer;
-    }
+    });
+  });
+  return qs;
+}
+
+/** regenerate fixed-order choice questions whose answer would repeat the previous position */
+function avoidFixedClash(qs: Question[], regen: (i: number) => Question): Question[] {
+  for (let i = 1; i < qs.length; i++) {
+    for (let k = 0; k < 25 && fixedPositionClash([qs[i - 1], qs[i]]) && qs[i].parts[0].fixedOrder; k++) qs[i] = regen(i);
   }
   return qs;
 }
@@ -87,17 +107,18 @@ export function buildMixed(rng: Rng, stats: Stats, recent: string[]): Question[]
   while (chosen.length < n && rest.length) chosen.push(rest.pop()!);
   const final = rng.shuffle(chosen.slice(0, n));
   const avoid = new Set(recent);
-  return final.map((t) => {
-    const w = weakness(stats, t);
-    const level: Level = w >= 0.4 ? rng.pick([1, 2] as Level[]) : rng.pick([2, 2, 3] as Level[]);
+  const make = (i: number) => {
+    const t = final[i];
+    const level: Level = weakness(stats, t) >= 0.4 ? rng.pick([1, 2] as Level[]) : rng.pick([2, 2, 3] as Level[]);
     return freshQuestion(rng, t, level, avoid);
-  });
+  };
+  return spreadChoiceAnswers(rng, avoidFixedClash(final.map((_, i) => make(i)), make));
 }
 
 /** Exam plan: every teacher item at least once; central items twice. */
 export const EXAM_PLAN: [TopicId, Level, PlaceType?][] = [
   ['placeValue', 1, 'fields'], ['placeValue', 3, 'composeWords'],
-  ['digitValue', 1, 'placeText'], ['digitValue', 2, 'valueText'], ['digitValue', 3, 'digitAtPlace'],
+  ['digitValue', 1, 'placeChoice'], ['digitValue', 2, 'valueChoice'], ['digitValue', 3, 'digitAtPlace'],
   ['prevNext', 2], ['prevNext', 3],
   ['evenOdd', 2],
   ['multDiv', 2], ['multDiv', 3],
@@ -113,12 +134,14 @@ export const EXAM_PLAN: [TopicId, Level, PlaceType?][] = [
 
 export function buildExam(rng: Rng, recent: string[]): Question[] {
   const avoid = new Set(recent);
-  return spreadChoiceAnswers(rng, EXAM_PLAN.map(([t, lv, type]) => {
+  const make = (i: number) => {
+    const [t, lv, type] = EXAM_PLAN[i];
     if (!type) return freshQuestion(rng, t, lv, avoid);
     const q = placeQuestion(rng, t, lv, type);
     avoid.add(q.sig);
     return q;
-  }));
+  };
+  return spreadChoiceAnswers(rng, avoidFixedClash(EXAM_PLAN.map((_, i) => make(i)), make));
 }
 
 export function isCorrectAnswer(q: Question, partIdx: number, given: string | undefined): boolean {

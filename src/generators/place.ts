@@ -4,16 +4,15 @@
  */
 import type { Level, Question, Part, TopicId } from '../types';
 import type { Rng } from '../rng';
-import { fmt, m, BLANK, makeChoices, mathChoice, textChoice, placeName, countWord, digitsOf } from '../format';
-import { valueAccepts, placeAccepts } from '../answers';
-import { cargoBays } from '../space';
+import { fmt, m, BLANK, makeChoices, mathChoice, textChoice, placeName, countWord, digitsOf, orderedChoices, placeOrder } from '../format';
+import { drawers as cargoBays } from '../club';
 
 /** numbers used in the lesson cards – never used in generated questions */
 export const LESSON_NUMBERS = new Set([7639, 7052, 2514, 8147, 473, 352, 3507, 2049, 5308, 3476]);
 
 export type PlaceType =
   | 'fields' | 'composeWords' | 'composeSum' | 'decompMissing' | 'chooseDecomp'
-  | 'placeText' | 'valueText' | 'digitAtPlace' | 'placeChoice' | 'valueNumber' | 'whichNumber' | 'repeated';
+  | 'placeChoice' | 'valueChoice' | 'digitAtPlace' | 'valueNumber' | 'whichNumber' | 'repeated';
 
 export interface PlaceOpts { n?: number; digitPlace?: number; askPlace?: number; shuffled?: boolean }
 
@@ -61,44 +60,43 @@ export function qFields(topic: TopicId, level: Level, n: number): Question {
   };
 }
 
-/** "באיזה מקום נמצאת הספרה 3 במספר 7639?" – typed answer "עשרות" */
-export function qPlaceText(topic: TopicId, level: Level, n: number, p: number): Question {
+/** "באיזה מקום נמצאת הספרה 3 במספר 7639?" – choose יחידות / עשרות / מאות / אלפים */
+export function qPlaceChoice(topic: TopicId, level: Level, n: number, p: number): Question {
   const ds = digitsOf(n);
   const d = ds[p];
-  const others = [0, 1, 2, 3].filter((q) => q !== p);
+  const order = placeOrder(ds.length);
+  const { choices, answer, fixedOrder } = orderedChoices(order.map((q) => textChoice(placeName(q))), order.indexOf(p));
   return {
-    topic, level, sig: `dv-placeText-${n}-${p}`,
+    topic, level, sig: `dv-place-${n}-${p}`,
     prompt: `באיזה מקום נמצאת הספרה <b>${d}</b> במספר <b>${fmt(n)}</b>?`,
     parts: [{
-      kind: 'text', answer: placeName(p), accept: placeAccepts(p), fieldHint: 'כתבי את שם המקום: יחידות, עשרות, מאות או אלפים',
-      hint: `התחילי מימין: הספרה הראשונה מימין היא ספרת היחידות, אחריה עשרות, מאות ואלפים. ספרי מקומות עד שתגיעי ל־${d}.`,
-      traps: [
-        { match: valueAccepts(d, p), hint: `כתבת את הערך של הספרה. כאן שואלים על <b>שם המקום</b> – כתבי במילה: יחידות, עשרות, מאות או אלפים.` },
-        { match: [String(d)], hint: `${d} היא הספרה עצמה. כתבי את <b>שם המקום</b> שלה במילה.` },
-        ...others.map((q) => ({ match: placeAccepts(q), hint: `${placeName(q)} זה לא המקום של ${d}. התחילי מימין וספרי: יחידות, עשרות, מאות, אלפים.` })),
-      ],
+      kind: 'choice', choices, answer, fixedOrder,
+      hint: `התחילי מימין: הספרה הימנית היא היחידות, אחריה עשרות, מאות ואלפים. ספרי מקומות עד שתגיעי ל־${d}.`,
     }],
-    hintFigure: cargoBays(n, { highlight: p, minPlaces: 4 }),
-    explanation: `במספר ${m(fmt(n))}: ${PLACES.map((q) => `${placeName(q)} – ${ds[q]}`).join(', ')}. הספרה ${d} נמצאת במקום ה<b>${placeName(p)}</b>.`,
+    hintFigure: cargoBays(n, { highlight: p }),
+    explanation: `במספר ${m(fmt(n))}: ${order.map((q) => `${placeName(q)} – ${ds[q]}`).join(', ')}. הספרה ${d} נמצאת במקום ה<b>${placeName(p)}</b>.`,
   };
 }
 
-/** "מה הערך של הספרה 3 במספר 7639?" – accepts 30, "שלושים", "3 עשרות" */
-export function qValueText(topic: TopicId, level: Level, n: number, p: number): Question {
-  const d = digitsOf(n)[p];
+/** "מה הערך של הספרה 3 במספר 7639?" – choose 3 / 30 / 300 / 3,000 */
+export function qValueChoice(topic: TopicId, level: Level, n: number, p: number, sigTag = 'value'): Question {
+  const ds = digitsOf(n);
+  const d = ds[p];
   const v = d * 10 ** p;
+  const places = [0, 1, 2, 3].filter((q) => q < ds.length);
+  const { choices, answer, fixedOrder } = orderedChoices(places.map((q) => mathChoice(fmt(d * 10 ** q))), places.indexOf(p));
   return {
-    topic, level, sig: `dv-valueText-${n}-${p}`,
+    topic, level, sig: `dv-${sigTag}-${n}-${p}`,
     prompt: `מה הערך של הספרה <b>${d}</b> במספר <b>${fmt(n)}</b>?`,
     parts: [{
-      kind: 'text', answer: fmt(v), accept: valueAccepts(d, p), fieldHint: 'כתבי את הערך – במספר או במילים',
-      hint: `קודם מצאי באיזה מקום נמצאת הספרה ${d}. אחר כך חשבי כמה היא שווה שם.`,
+      kind: 'choice', choices, answer, fixedOrder,
+      hint: `קודם מצאי באיזה מקום נמצאת הספרה ${d}. אחר כך חשבי: כמה הן ${d} חבילות מהסוג של המקום הזה?`,
       traps: [
-        { match: placeAccepts(p), hint: `מצאת את המקום. כמה הן ${d} ${placeName(p)}?` },
-        { match: [String(d)], hint: `${d} היא הספרה. במקום ה${placeName(p)} היא שווה יותר – כמה הן ${d} ${placeName(p)}?` },
+        ...(p !== 0 ? [{ match: [fmt(d)], hint: `${d} היא הספרה עצמה. היא נמצאת במקום ה${placeName(p)}, ושם היא שווה יותר. כמה הן ${d} ${placeName(p)}?` }] : []),
+        ...places.filter((q) => q !== p && !(q === 0 && p !== 0)).map((q) => ({ match: [fmt(d * 10 ** q)], hint: `${fmt(d * 10 ** q)} זה ${countWord(d, q)}. בדקי שוב: באיזה מקום נמצאת הספרה ${d}?` })),
       ],
     }],
-    hintFigure: cargoBays(n, { highlight: p, open: p, minPlaces: 4 }),
+    hintFigure: cargoBays(n, { highlight: p, open: p }),
     explanation: `הספרה ${d} נמצאת במקום ה${placeName(p)}. ${countWord(d, p)} הן ${m(fmt(v))}, לכן הערך שלה הוא ${m(fmt(v))}.`,
   };
 }
@@ -190,22 +188,6 @@ export function qChooseDecomp(rng: Rng, topic: TopicId, level: Level, n: number)
   };
 }
 
-/** choose the place name (4 options) */
-export function qPlaceChoice(topic: TopicId, level: Level, n: number, p: number): Question {
-  const ds = digitsOf(n);
-  const d = ds[p];
-  const { choices, answer } = makeChoices(null, textChoice(placeName(p)), [0, 1, 2, 3].filter((q) => q !== p).map((q) => textChoice(placeName(q))));
-  const order = ['אלפים', 'מאות', 'עשרות', 'יחידות'];
-  choices.sort((a, b) => order.indexOf(a.text) - order.indexOf(b.text));
-  return {
-    topic, level, sig: `dv-place-${n}-${p}`,
-    prompt: `באיזה מקום נמצאת הספרה <b>${d}</b> במספר <b>${fmt(n)}</b>?`,
-    parts: [{ kind: 'choice', choices, answer, hint: `התחילי מימין: יחידות, עשרות, מאות, אלפים. ספרי מקומות עד שתגיעי ל־${d}.` }],
-    hintFigure: cargoBays(n, { highlight: p, minPlaces: 4 }),
-    explanation: `במספר ${m(fmt(n))} הספרה ${d} נמצאת במקום ה${placeName(p)}.`,
-  };
-}
-
 /** numeric value of a digit (number keyboard) */
 export function qValueNumber(topic: TopicId, level: Level, n: number, p: number): Question {
   const d = digitsOf(n)[p];
@@ -250,14 +232,11 @@ export function qRepeated(rng: Rng, topic: TopicId, level: Level): Question {
     for (const p of places) ds[p] = d;
     if (ds[3] === 0) continue;
     const n = fromDigits(ds);
+    if (LESSON_NUMBERS.has(n)) continue;
     const tp = rng.pick(places);
-    return {
-      topic, level, sig: `dv-rep-${n}-${tp}`,
-      prompt: `במספר <b>${fmt(n)}</b> הספרה ${d} מופיעה פעמיים. מה הערך של הספרה ${d} שנמצאת במקום ה<b>${placeName(tp)}</b>?`,
-      parts: [{ kind: 'text', answer: fmt(d * 10 ** tp), accept: valueAccepts(d, tp), fieldHint: 'כתבי את הערך – במספר או במילים', hint: `${countWord(d, tp)} – כמה זה?`, traps: [{ match: placeAccepts(tp), hint: `נכון, היא במקום ה${placeName(tp)}. כמה הן ${d} ${placeName(tp)}?` }] }],
-      hintFigure: cargoBays(n, { highlight: tp, open: tp, minPlaces: 4 }),
-      explanation: `הספרה ${d} במקום ה${placeName(tp)} שווה ${countWord(d, tp)}, כלומר ${m(fmt(d * 10 ** tp))}.`,
-    };
+    const q = qValueChoice(topic, level, n, tp, 'rep');
+    q.prompt = `במספר <b>${fmt(n)}</b> הספרה ${d} מופיעה פעמיים. מה הערך של הספרה ${d} שנמצאת במקום ה<b>${placeName(tp)}</b>?`;
+    return q;
   }
 }
 
@@ -271,8 +250,7 @@ export function placeQuestion(rng: Rng, topic: TopicId, level: Level, type: Plac
   const dp = o.digitPlace ?? rng.pick(nonzeroP.length ? nonzeroP : [3]);
   switch (type) {
     case 'fields': return qFields(topic, level, n);
-    case 'placeText': return qPlaceText(topic, level, n, dp);
-    case 'valueText': return qValueText(topic, level, n, dp);
+    case 'valueChoice': return qValueChoice(topic, level, n, dp);
     case 'digitAtPlace': return qDigitAtPlace(rng, topic, level, n, o.askPlace ?? rng.int(0, 3));
     case 'composeWords': return qComposeWords(rng, topic, level, n, o.shuffled ?? level === 3);
     case 'composeSum': return qComposeSum(topic, level, n);
@@ -291,9 +269,9 @@ const PV_BY_LEVEL: Record<Level, PlaceType[]> = {
   3: ['chooseDecomp', 'composeWords', 'fields'],
 };
 const DV_BY_LEVEL: Record<Level, PlaceType[]> = {
-  1: ['placeText', 'valueNumber', 'digitAtPlace'],
-  2: ['valueText', 'placeChoice', 'placeText', 'digitAtPlace'],
-  3: ['whichNumber', 'repeated', 'valueText'],
+  1: ['placeChoice', 'valueNumber', 'digitAtPlace'],
+  2: ['valueChoice', 'placeChoice', 'digitAtPlace', 'valueNumber'],
+  3: ['whichNumber', 'repeated', 'valueChoice'],
 };
 
 export function placeValue(rng: Rng, level: Level): Question {
@@ -323,16 +301,29 @@ export function familyRound(rng: Rng, topic: 'placeValue' | 'digitValue'): Quest
       placeQuestion(rng, topic, 3, 'chooseDecomp', { n: B }),
     ];
   }
-  // digitValue: A digit asked twice – once its place, later its value (place ≠ value)
-  const aP = rng.int(0, 2);
-  const askA = rng.pick([0, 1, 2, 3].filter((p) => p !== aP));
-  const [b1, b2] = rng.sample(bNonZero, 2);
-  return [
-    placeQuestion(rng, topic, 1, 'placeText', { n: A, digitPlace: aP }),
-    placeQuestion(rng, topic, 1, 'valueText', { n: B, digitPlace: b1 }),
-    placeQuestion(rng, topic, 2, 'digitAtPlace', { n: A, askPlace: askA }),
-    placeQuestion(rng, topic, 2, 'placeText', { n: B, digitPlace: b2 }),
-    placeQuestion(rng, topic, 3, 'valueText', { n: A, digitPlace: aP }),
-    placeQuestion(rng, topic, 3, rng.pick(['whichNumber', 'repeated'] as PlaceType[])),
-  ];
+  // digitValue: A's digit is asked twice – first its place, later (not right after) its value
+  for (let attempt = 0; ; attempt++) {
+    const aP = rng.int(0, 2);
+    const askA = rng.pick([0, 1, 2, 3].filter((p) => p !== aP));
+    const [b1, b2] = rng.sample(bNonZero, 2);
+    const qs = [
+      placeQuestion(rng, topic, 1, 'placeChoice', { n: A, digitPlace: aP }),
+      placeQuestion(rng, topic, 1, 'valueChoice', { n: B, digitPlace: b1 }),
+      placeQuestion(rng, topic, 2, 'digitAtPlace', { n: A, askPlace: askA }),
+      placeQuestion(rng, topic, 2, 'valueNumber', { n: B, digitPlace: b2 }),
+      placeQuestion(rng, topic, 3, 'valueChoice', { n: A, digitPlace: aP }),
+      placeQuestion(rng, topic, 3, rng.pick(['whichNumber', 'repeated'] as PlaceType[])),
+    ];
+    if (!fixedPositionClash(qs) || attempt > 60) return qs;
+  }
 }
+
+/** true when two choice questions in a row would have the right answer in the same (fixed) position */
+export function fixedPositionClash(qs: Question[]): boolean {
+  for (let i = 1; i < qs.length; i++) {
+    const a = qs[i - 1].parts[qs[i - 1].parts.length - 1], b = qs[i].parts[0];
+    if (a.kind === 'choice' && b.kind === 'choice' && (a.fixedOrder || b.fixedOrder) && a.answer === b.answer) return true;
+  }
+  return false;
+}
+

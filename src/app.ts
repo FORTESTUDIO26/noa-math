@@ -6,7 +6,8 @@ import { buildTopicRound, buildMixed, buildExam, isCorrectAnswer, type Stats } f
 import { getLesson } from './lessons';
 import { esc, renderBlank } from './format';
 import { checkPart, splitFields, isFilled } from './answers';
-import { robot, packs } from './space';
+import { friend, packs } from './club';
+import { topicIcon, modeIcon, homeScene, puzzleIcon } from './art';
 
 /* ================================================================== state */
 
@@ -14,7 +15,7 @@ interface PartProg { attempts: number; status: 'open' | 'correct' | 'failed'; wr
 type Screen =
   | { name: 'home' }
   | { name: 'topics' }
-  | { name: 'lesson'; topic: TopicId; from: 'topics' | 'practice' | 'results' }
+  | { name: 'lesson'; topic: TopicId; from: 'topics' | 'practice' | 'results'; step?: number }
   | { name: 'practice' }
   | { name: 'summary' }
   | { name: 'exam' }
@@ -155,25 +156,24 @@ function addStat(topic: TopicId, ok: boolean) {
 /* ================================================================== rendering helpers */
 
 const btn = (act: string, label: string, cls = 'btn', extra = '') => `<button type="button" class="${cls}" data-act="${act}" ${extra}>${label}</button>`;
+const arrowL = '<span class="arr" aria-hidden="true">←</span>';
 
-function header(title: string, back: string | null = 'home') {
-  return `<header class="top">${back ? btn(back === 'home' ? 'home' : back, '<span aria-hidden="true">→</span> ' + (back === 'home' ? 'לבית' : 'חזרה'), 'btn-back') : ''}<div class="top-title">${title}</div></header>`;
+function header(title: string, back: string | null = 'home', icon = '') {
+  return `<header class="top">${back ? btn(back === 'home' ? 'home' : back, `<span aria-hidden="true">→</span> ${back === 'home' ? 'לבית' : 'חזרה'}`, 'btn-back') : ''}<div class="top-title">${icon}<span>${title}</span></div></header>`;
 }
 
 function progressBar(i: number, n: number, label = 'שאלה') {
   return `<div class="progress" aria-live="polite"><div class="progress-text">${label} ${i + 1} מתוך ${n}</div><div class="bar" role="progressbar" aria-valuemin="1" aria-valuemax="${n}" aria-valuenow="${i + 1}"><span style="width:${((i + 1) / n) * 100}%"></span></div></div>`;
 }
 
+const GEO: TopicId[] = ['angles', 'polygons', 'triangles'];
+
 function questionHead(q: Question) {
+  const geo = GEO.includes(q.topic);
   return `<div class="q-prompt">${q.prompt}</div>` +
     (q.math ? `<div class="q-math${q.math.length > 17 ? ' q-math-long' : ''}" dir="ltr">${renderBlank(esc(q.math))}</div>` : '') +
-    (q.figure ? (GEO.includes(q.topic) ? geoTray(q.figure) : `<div class="q-figure">${q.figure}</div>`) : GEO.includes(q.topic) ? geoTray('') : '');
-}
-
-const GEO: TopicId[] = ['angles', 'polygons', 'triangles'];
-/** geometry figures are "parts" that Robi collects for the spaceship */
-function geoTray(fig: string): string {
-  return `<div class="tray${fig ? '' : ' tray-empty'}"><div class="tray-label">${robot('collect', 34)}<span>${fig ? 'רובי אוסף חלק לחללית' : 'עזרי לרובי לבחור את החלק הנכון לחללית'}</span></div>${fig ? `<div class="q-figure">${fig}</div>` : ''}</div>`;
+    (q.figure ? `<div class="q-figure${geo ? ' q-figure-part' : ''}">${q.figure}</div>` : '') +
+    (geo ? `<div class="part-note">${puzzleIcon(22)}<span>${q.figure ? 'חלק פאזל מהמועדון' : 'מצאי את חלק הפאזל הנכון'}</span></div>` : '');
 }
 
 function choiceGridClass(q: Question, pi: number) {
@@ -181,6 +181,7 @@ function choiceGridClass(q: Question, pi: number) {
   if (cs.some((c) => c.isFigure && c.html.includes('class="grp"'))) return 'choices choices-fig choices-1';
   if (cs.some((c) => c.isFigure)) return 'choices choices-fig';
   if (cs.some((c) => c.text.length > 13)) return 'choices choices-1';
+  if (cs.length === 3) return cs.every((c) => c.text.length <= 6) ? 'choices choices-3' : 'choices choices-1';
   return cs.length <= 2 ? 'choices choices-2' : 'choices';
 }
 
@@ -190,25 +191,34 @@ function inputAttrs(kind: 'number' | 'text'): string {
     : 'type="text" inputmode="text" lang="he" dir="rtl" autocapitalize="off" autocorrect="off" spellcheck="false"';
 }
 
-/** text / number answer box (+ the short instruction under it) */
+/** number (or old text) answer box + the short instruction under it */
 function answerBox(part: Part, attrs: string, value = ''): string {
   const kind = part.kind === 'text' ? 'text' : 'number';
   const hintId = attrs.match(/data-(?:input|exam-input)="([^"]+)"/)?.[1] ?? '';
   return `<div class="answer-box"><div class="num-form-row"><input class="num-input${kind === 'text' ? ' text-input' : ''}" ${inputAttrs(kind)} ${attrs} enterkeyhint="done" autocomplete="off" aria-label="התשובה שלך" ${part.fieldHint ? `aria-describedby="fh-${esc(hintId)}"` : ''} value="${esc(value)}" />${part.suffix ? `<span class="suffix">${part.suffix}</span>` : ''}</div>${part.fieldHint ? `<div class="field-hint" id="fh-${esc(hintId)}">${part.fieldHint}</div>` : ''}</div>`;
 }
 
-/** notebook rows: [ box ] label — box first, in Hebrew reading order */
-function fieldRows(part: Part, values: string[], attr: (i: number) => string, state: { bad?: boolean[]; locked?: boolean; reveal?: boolean } = {}): string {
+/**
+ * notebook rows: [ box ] label — box first, in Hebrew reading order.
+ * An empty box and a wrong digit are two different states with their own message.
+ */
+function fieldRows(part: Part, values: string[], attr: (i: number) => string, st: { bad?: boolean[]; locked?: boolean; reveal?: boolean } = {}): string {
   return `<div class="frows">${part.fields!.map((f, i) => {
-    const bad = state.bad?.[i];
-    const v = state.reveal && bad ? f.answer : values[i] ?? '';
-    const mark = state.locked ? (bad ? `<span class="fmark fmark-bad">✗ התשובה: ${esc(f.answer)}</span>` : '<span class="fmark fmark-ok">✓</span>') : bad ? '<span class="fmark fmark-bad">✗ לתיקון</span>' : '';
-    return `<div class="frow${bad ? ' frow-bad' : ''}"><input class="num-input field-input" ${inputAttrs('number')} ${attr(i)} enterkeyhint="${i < 3 ? 'next' : 'done'}" autocomplete="off" aria-label="${f.label}" value="${esc(v)}" ${state.locked ? 'readonly' : ''} /><span class="flabel">${f.label}</span>${mark}</div>`;
+    const bad = st.bad?.[i];
+    const typed = values[i] ?? '';
+    const v = st.reveal && bad ? f.answer : typed;
+    let mark = '';
+    if (st.locked) mark = bad ? `<span class="fmark fmark-bad">✗ התשובה: ${esc(f.answer)}</span>` : '<span class="fmark fmark-ok">✓ נכון</span>';
+    else if (bad) mark = typed.trim() === '' ? '<span class="fmark fmark-empty">○ השורה ריקה</span>' : '<span class="fmark fmark-bad">✗ לתיקון</span>';
+    const cls = bad ? (typed.trim() === '' && !st.locked ? ' frow-empty' : ' frow-bad') : st.locked ? ' frow-ok' : '';
+    return `<div class="frow${cls}"><input class="num-input field-input" ${inputAttrs('number')} ${attr(i)} enterkeyhint="${i < part.fields!.length - 1 ? 'next' : 'done'}" autocomplete="off" aria-label="${f.label}" value="${esc(v)}" ${st.locked ? 'readonly' : ''} /><span class="flabel">${f.label}</span>${mark}</div>`;
   }).join('')}</div>`;
 }
 
-function feedbackGood(first: boolean): string {
-  return `<div class="good" role="status">${robot('wave', 52)}<span>${first ? 'כל הכבוד! 🎉 רובי מנופף לך!' : 'יפה! הצלחת בניסיון השני 👏'}</span></div>`;
+function feedbackGood(first: boolean, seed: string): string {
+  // the puppy wags its tail or the kitten raises a paw
+  const puppy = seed.length % 2 === 0;
+  return `<div class="good" role="status">${friend(puppy ? 'puppy' : 'kitten', 'cheer', 58, puppy)}<div><b>${first ? 'נכון! כל הכבוד!' : 'נכון! הצלחת בניסיון השני.'}</b><span>${puppy ? 'הכלבלב מכשכש בזנב.' : 'החתלתולה מרימה כפה.'}</span></div></div>`;
 }
 
 /** Interactive question with hints (practice + lesson "עכשיו תורך") */
@@ -232,38 +242,38 @@ function renderRunner(q: Question, prog: PartProg[], key: string): string {
     } else if (part.kind === 'fields') {
       const vals = pp.values ?? part.fields!.map(() => '');
       if (pp.status === 'open') {
-        h += `<form class="fields-form" data-key="${key}" data-part="${pi}" autocomplete="off">${fieldRows(part, vals, (i) => `data-field="${key}-${pi}-${i}"`, { bad: pp.attempts > 0 ? pp.bad : undefined })}${part.fieldHint ? `<div class="field-hint">${part.fieldHint}</div>` : ''}<button type="submit" class="btn btn-primary btn-wide">בדיקה</button></form>`;
+        h += `<form class="fields-form" data-key="${key}" data-part="${pi}" autocomplete="off">${fieldRows(part, vals, (i) => `data-field="${key}-${pi}-${i}"`, { bad: pp.bad })}${part.fieldHint ? `<div class="field-hint">${part.fieldHint}</div>` : ''}<button type="submit" class="btn btn-primary btn-wide">בדיקה</button></form>`;
       } else {
         h += fieldRows(part, vals, (i) => `data-field-done="${i}"`, { bad: pp.status === 'failed' ? pp.bad : part.fields!.map(() => false), locked: true, reveal: pp.status === 'failed' });
       }
     } else {
-      h += `<div class="${choiceGridClass(q, pi)}" role="group">`;
+      h += `<div class="${choiceGridClass(q, pi)}" role="group" aria-label="אפשרויות תשובה">`;
       for (const c of part.choices!) {
         const wasWrong = pp.wrong.includes(c.id);
         const isAns = c.id === part.answer;
         let cls = 'choice';
         let mark = '';
-        if (wasWrong) { cls += ' wrong'; mark = '<span class="mark" aria-label="לא נכון">✗</span>'; }
-        if (pp.status !== 'open' && isAns) { cls += ' right'; mark = '<span class="mark" aria-label="נכון">✓</span>'; }
+        if (wasWrong) { cls += ' wrong'; mark = '<span class="mark">✗ לא נכון</span>'; }
+        if (pp.status !== 'open' && isAns) { cls += ' right'; mark = '<span class="mark">✓ נכון</span>'; }
         const disabled = pp.status !== 'open' || wasWrong;
-        h += `<button type="button" class="${cls}" data-act="choose" data-key="${key}" data-part="${pi}" data-choice="${c.id}" ${disabled ? 'disabled' : ''}>${mark}<span class="choice-body">${c.html}</span></button>`;
+        h += `<button type="button" class="${cls}" data-act="choose" data-key="${key}" data-part="${pi}" data-choice="${c.id}" ${disabled ? 'disabled' : ''}><span class="choice-body">${c.html}</span>${mark}</button>`;
       }
       h += `</div>`;
     }
     if (pp.status === 'open' && (pp.attempts === 1 || (pp.attempts === 0 && pp.hintText))) {
-      h += `<div class="hint" role="status">${robot('think', 44)}<div><b>💡 ${pp.attempts ? 'רמז' : 'שימי לב'}:</b> ${pp.hintText ?? part.hint}${pp.attempts ? '<div class="try-again">נסי שוב!</div>' : ''}</div></div>`;
+      h += `<div class="hint" role="status">${friend('bunny', 'think', 48)}<div class="bubble"><b>${pp.attempts ? 'רמז' : 'שימי לב'}:</b> ${pp.hintText ?? part.hint}${pp.attempts ? '<div class="try-again">נסי שוב!</div>' : ''}</div></div>`;
     }
     if (pp.status !== 'open' && part.after) h += `<div class="after">${part.after}</div>`;
-    if (pp.status === 'correct') h += feedbackGood(pp.attempts === 0);
+    if (pp.status === 'correct') h += feedbackGood(pp.attempts === 0, q.sig);
     h += `</div>`;
   });
   // a picture that gives the answer away appears only with the hint or after checking
   // (for the 4-box decomposition only after checking – it would show all four digits)
-  if (q.hintFigure && (done || (hinted && !q.parts.some((p) => p.kind === 'fields')))) h += `<div class="hint-figure"><div class="hint-figure-label">${done ? 'ככה זה נראה בחללית:' : 'רמז מהחללית:'}</div>${q.hintFigure}</div>`;
+  if (q.hintFigure && (done || (hinted && !q.parts.some((p) => p.kind === 'fields')))) h += `<div class="hint-figure"><div class="hint-figure-label">${done ? 'ככה זה נראה:' : 'רמז בציור:'}</div>${q.hintFigure}</div>`;
   if (done) {
     const anyFail = prog.some((p) => p.status === 'failed');
     h += anyFail
-      ? `<div class="explain" role="status">${robot('idle', 40)}<div><b>פתרון מוסבר:</b> ${q.explanation}</div></div>`
+      ? `<div class="explain" role="status">${friend('kitten', 'oops', 46)}<div><b>פתרון מוסבר:</b> ${q.explanation}</div></div>`
       : `<details class="explain-more"><summary>איך פותרים?</summary><div>${q.explanation}</div></details>`;
   }
   return h;
@@ -283,24 +293,31 @@ function homeView(): string {
   let resume = '';
   const p = state.practice;
   if (p && !p.finished) {
-    const what = p.mode === 'topic' ? `תרגול: ${topicById(p.topic!).name}` : 'תרגול מעורב';
-    resume += `<button class="card card-resume" data-act="continue-practice"><span class="card-icon">▶️</span><span><b>להמשיך מאיפה שעצרת</b><br><small>${what} – שאלה ${p.index + 1} מתוך ${p.questions.length}</small></span></button>`;
+    const what = p.mode === 'topic' ? topicById(p.topic!).name : 'תרגול מעורב';
+    resume += `<button class="resume" data-act="continue-practice"><span class="resume-dot" aria-hidden="true">▶</span><span><b>להמשיך מאיפה שעצרת</b><small>${what} · שאלה ${p.index + 1} מתוך ${p.questions.length}</small></span></button>`;
   }
   if (state.exam && !state.exam.submitted) {
-    resume += `<button class="card card-resume" data-act="continue-exam"><span class="card-icon">▶️</span><span><b>להמשיך את המבחן לדוגמה</b><br><small>ענית על ${state.exam.questions.filter((q, i) => q.parts.every((p, pi) => isFilled(p, state.exam!.answers[i][pi]))).length} מתוך ${state.exam.questions.length}</small></span></button>`;
+    const done = state.exam.questions.filter((q, i) => q.parts.every((pp, pi) => isFilled(pp, state.exam!.answers[i][pi]))).length;
+    resume += `<button class="resume" data-act="continue-exam"><span class="resume-dot" aria-hidden="true">▶</span><span><b>להמשיך את המבחן לדוגמה</b><small>ענית על ${done} מתוך ${state.exam.questions.length}</small></span></button>`;
   }
   const weak = TOPICS.filter((t) => (state.stats[t.id]?.wrong ?? 0) > 0)
     .sort((a, b) => (state.stats[b.id]!.wrong / state.stats[b.id]!.seen) - (state.stats[a.id]!.wrong / state.stats[a.id]!.seen)).slice(0, 3);
+  const mode = (act: string, icon: string, title: string, sub: string) =>
+    `<button class="card mode" data-act="${act}">${icon}<span class="mode-text"><b>${title}</b><small>${sub}</small></span><span class="mode-go" aria-hidden="true">←</span></button>`;
   return `<main class="screen home">
-    <div class="hello">${robot('wave', 64)}<div><h1 class="app-title">המתמטיקה של נועה</h1><p class="hello-text">שלום נועה! אני רובי מתחנת החלל. בואי נתרגל יחד.</p></div></div>
-    <p class="sub">${d > 0 ? `עוד ${d} ימים למבחן (יום חמישי, 3.12) 💪` : d === 0 ? 'היום המבחן! בהצלחה 🍀' : 'בהצלחה בהמשך! 🌟'}</p>
+    <div class="home-head">
+      <h1 class="app-title">המתמטיקה של נועה</h1>
+      <span class="countdown">${d > 0 ? `עוד ${d} ימים למבחן · יום חמישי 3.12` : d === 0 ? 'היום המבחן – בהצלחה!' : 'בהצלחה בהמשך!'}</span>
+    </div>
+    ${homeScene()}
+    <p class="hello-text">שלום נועה! ברוכה הבאה למועדון החיות. במה נתרגל היום?</p>
     ${resume}
     <nav class="modes" aria-label="דרכי תרגול">
-      <button class="card" data-act="topics"><span class="card-icon">📚</span><span><b>תרגול לפי נושא</b><br><small>בוחרים נושא, רואים הסבר ודוגמה, ומתרגלים 6 שאלות</small></span></button>
-      <button class="card" data-act="start-mixed"><span class="card-icon">🎲</span><span><b>תרגול מעורב</b><br><small>${CONFIG.mixedLength} שאלות מכל הנושאים, יותר ממה שקשה לך</small></span></button>
-      <button class="card" data-act="start-exam"><span class="card-icon">📝</span><span><b>מבחן לדוגמה</b><br><small>כל נושאי המבחן. הפתרונות מוצגים רק בסוף</small></span></button>
+      ${mode('topics', modeIcon('topics'), 'תרגול לפי נושא', 'הסבר, דוגמה ו־6 שאלות')}
+      ${mode('start-mixed', modeIcon('mixed'), 'תרגול מעורב', `${CONFIG.mixedLength} שאלות מכל הנושאים, יותר ממה שקשה לך`)}
+      ${mode('start-exam', modeIcon('exam'), 'מבחן לדוגמה', 'כל נושאי המבחן, פתרונות בסוף')}
     </nav>
-    ${weak.length ? `<section class="weak"><h2>כדאי לחזק:</h2>${weak.map((t) => btn(`open-topic`, `${t.icon} ${t.name}`, 'chip', `data-topic="${t.id}"`)).join('')}</section>` : ''}
+    ${weak.length ? `<section class="weak"><h2>כדאי לחזק</h2><div class="chips">${weak.map((t) => btn('open-topic', `${topicIcon(t.id, 22)}<span>${t.name}</span>`, 'chip', `data-topic="${t.id}"`)).join('')}</div></section>` : ''}
   </main>`;
 }
 
@@ -309,43 +326,63 @@ function topicsView(): string {
     `<h2 class="group-title">${title}</h2><div class="topic-list">` +
     TOPICS.filter((t) => t.area === area).map((t) => {
       const s = state.stats[t.id];
-      const badge = s && s.seen ? `<small class="topic-stat">${s.firstTry} מתוך ${s.seen} בניסיון ראשון</small>` : '<small class="topic-stat">עוד לא תרגלת</small>';
-      return `<button class="topic" data-act="open-topic" data-topic="${t.id}"><span class="card-icon" aria-hidden="true">${t.icon}</span><span><b>${t.name}</b><br>${badge}</span></button>`;
+      const badge = s && s.seen ? `${s.firstTry} מתוך ${s.seen} בניסיון ראשון` : 'עוד לא תרגלת';
+      return `<button class="topic" data-act="open-topic" data-topic="${t.id}">${topicIcon(t.id, 38)}<span class="topic-text"><b>${t.name}</b><small class="topic-stat">${badge}</small></span><span class="mode-go" aria-hidden="true">←</span></button>`;
     }).join('') + `</div>`;
-  return `${header('תרגול לפי נושא')}<main class="screen"><p class="lead">בחרי נושא:</p>${group('numbers', 'מספרים ופעולות')}${group('geometry', 'גיאומטריה')}</main>`;
+  return `${header('תרגול לפי נושא')}<main class="screen"><p class="lead">בחרי נושא. לפני התרגול יש הסבר קצר ודוגמה.</p>${group('numbers', 'מספרים ופעולות')}${group('geometry', 'גיאומטריה')}</main>`;
 }
 
-function lessonView(topic: TopicId, from: 'topics' | 'practice' | 'results'): string {
+/** lesson = steps: for every skill an example screen, then a "עכשיו תורך" screen */
+function lessonSteps(topic: TopicId) {
+  const L = getLesson(topic);
+  return L.skills.flatMap((s, i) => [{ skill: i, kind: 'ex' as const, s }, { skill: i, kind: 'try' as const, s }]);
+}
+
+function lessonView(topic: TopicId, from: 'topics' | 'practice' | 'results', stepIdx: number): string {
   const t = topicById(topic);
-  const lesson = getLesson(topic);
+  const steps = lessonSteps(topic);
+  const st = steps[Math.min(stepIdx, steps.length - 1)];
+  const multi = steps.length > 2;
   const p = state.practice;
-  let primary: string;
-  if (from === 'practice' && p) {
-    primary = btn('back-to-practice', p.mode === 'topic' ? `חזרה לתרגול (שאלה ${p.index + 1})` : `חזרה לתרגול המעורב (שאלה ${p.index + 1})`, 'btn btn-primary btn-wide');
-  } else {
-    primary = btn('start-topic', 'ישר לתרגול ⟵', 'btn btn-primary btn-wide', `data-topic="${topic}"`);
-  }
+  const primary = from === 'practice' && p
+    ? btn('back-to-practice', `חזרה לתרגול (שאלה ${p.index + 1}) ${arrowL}`, 'btn btn-primary btn-sm')
+    : btn('start-topic', `ישר לתרגול ${arrowL}`, 'btn btn-primary btn-sm', `data-topic="${topic}"`);
   const backAct = from === 'practice' ? 'back-to-practice' : from === 'results' ? 'back-to-results' : 'topics';
-  let h = `${header(`${t.icon} ${t.name}`, backAct)}<main class="screen lesson">
-    <h1 class="lesson-title">איך עושים את זה?</h1>
-    <div class="lesson-top">${primary}</div>`;
-  lesson.skills.forEach((s, i) => {
-    const key = `L:${topic}:${i}`;
-    const prog = state.lessonTry[key] ?? newProg(s.tryIt);
-    h += `<section class="skill" aria-label="${esc(s.title)}">
-      ${lesson.skills.length > 1 ? `<h2 class="skill-title">${i + 1}. ${s.title}</h2>` : `<h2 class="skill-title">${s.title}</h2>`}
+  const dots = `<nav class="steps-nav" aria-label="שלבי ההסבר">${steps.map((x, i) =>
+    `<button class="step-dot${i === stepIdx ? ' current' : ''}" data-act="lesson-step" data-step="${i}" aria-label="${x.kind === 'ex' ? 'דוגמה' : 'עכשיו תורך'}${multi ? ` – ${x.s.title}` : ''}" ${i === stepIdx ? 'aria-current="step"' : ''}>${x.kind === 'ex' ? 'דוגמה' : 'תורך'}${multi ? ` ${x.skill + 1}` : ''}</button>`).join('')}</nav>`;
+  let h = `${header(t.name, backAct, topicIcon(topic, 28))}<main class="screen lesson">
+    <div class="lesson-bar"><h1 class="lesson-title">איך עושים את זה?</h1><div class="lesson-top">${primary}</div></div>
+    ${dots}`;
+  const s = st.s;
+  if (st.kind === 'ex') {
+    h += `<section class="ex" aria-label="דוגמה פתורה">
+      <h2 class="skill-title">${multi ? `${st.skill + 1}. ` : ''}${s.title}</h2>
       <p class="skill-explain">${s.explain}</p>
       <div class="example"><div class="example-label">דוגמה פתורה</div>
         <div class="example-task">${s.example.task}</div>
         ${s.example.figure ? `<div class="q-figure">${s.example.figure}</div>` : ''}
-        <ol class="steps">${s.example.steps.map((st) => `<li>${st}</li>`).join('')}</ol>
-        <div class="example-answer">✔ ${s.example.answer}</div>
+        <ol class="steps">${s.example.steps.map((x) => `<li>${x}</li>`).join('')}</ol>
+        <div class="example-answer">${s.example.answer}</div>
       </div>
-      <div class="your-turn" data-runner="${key}"><div class="your-turn-label">עכשיו תורך</div>${renderRunner(s.tryIt, prog, key)}
-      ${prog.every((x) => x.status !== 'open') ? btn('retry-lesson', 'לנסות שוב', 'btn btn-small', `data-key="${key}"`) : ''}</div>
+      <div class="step-buttons">${btn('lesson-step', `עכשיו תורך ${arrowL}`, 'btn btn-primary btn-wide', `data-step="${stepIdx + 1}"`)}</div>
     </section>`;
-  });
-  h += `<div class="lesson-bottom">${primary}</div></main>`;
+  } else {
+    const key = `L:${topic}:${st.skill}`;
+    const prog = state.lessonTry[key] ?? newProg(s.tryIt);
+    const done = prog.every((x) => x.status !== 'open');
+    const last = stepIdx === steps.length - 1;
+    h += `<section class="your-turn" data-runner="${key}" aria-label="עכשיו תורך">
+      <div class="your-turn-label">${friend('bunny', 'happy', 36)}<span>עכשיו תורך${multi ? ` · ${s.title}` : ''}</span></div>
+      ${renderRunner(s.tryIt, prog, key)}
+      <div class="step-buttons">
+        ${btn('lesson-step', '→ לדוגמה', 'btn', `data-step="${stepIdx - 1}"`)}
+        ${done ? btn('retry-lesson', 'לנסות שוב', 'btn', `data-key="${key}"`) : ''}
+        ${done && !last ? btn('lesson-step', `לחלק הבא ${arrowL}`, 'btn btn-primary', `data-step="${stepIdx + 1}"`) : ''}
+        ${done && last ? primary.replace('btn-sm', '') : ''}
+      </div>
+    </section>`;
+  }
+  h += `</main>`;
   return h;
 }
 
@@ -356,12 +393,12 @@ function practiceView(): string {
   const done = prog.every((x) => x.status !== 'open');
   const last = p.index === p.questions.length - 1;
   const title = p.mode === 'topic' ? topicById(p.topic!).name : 'תרגול מעורב';
-  return `${header(title)}<main class="screen practice">
+  return `${header(title, 'home', p.mode === 'topic' ? topicIcon(p.topic!, 28) : modeIcon('mixed', 28))}<main class="screen practice">
     ${progressBar(p.index, p.questions.length)}
-    <div class="q-tools"><span class="tag">${topicById(q.topic).icon} ${topicById(q.topic).name}</span>
-      ${btn('lesson-from-practice', p.mode === 'topic' ? '📖 להסבר ולדוגמה' : '📖 להסבר', 'btn btn-small btn-ghost')}</div>
+    <div class="q-tools">${p.mode === 'mixed' ? `<span class="tag">${topicIcon(q.topic, 20)}${topicById(q.topic).name}</span>` : '<span></span>'}
+      ${btn('lesson-from-practice', p.mode === 'topic' ? 'להסבר ולדוגמה' : 'להסבר', 'btn-link')}</div>
     <div class="q-card" data-runner="P">${renderRunner(q, prog, 'P')}</div>
-    ${done ? `<div class="next-row">${btn('next-q', last ? 'לסיכום ⟵' : 'לשאלה הבאה ⟵', 'btn btn-primary btn-wide')}</div>` : ''}
+    ${done ? `<div class="next-row">${btn('next-q', `${last ? 'לסיכום' : 'לשאלה הבאה'} ${arrowL}`, 'btn btn-primary btn-wide')}</div>` : ''}
   </main>`;
 }
 
@@ -371,11 +408,11 @@ function summaryView(): string {
   const first = res.filter((r) => r === 'first').length;
   const ok = res.filter((r) => r !== 'fail').length;
   const n = p.questions.length;
-  const msg = first === n ? 'מושלם! 🌟' : ok >= n - 1 ? 'עבודה יפה מאוד! 👏' : 'כל תרגול מקדם אותך! 💪';
+  const msg = first === n ? 'מושלם!' : ok >= n - 1 ? 'עבודה יפה מאוד!' : 'כל תרגול מקדם אותך!';
   return `${header('סיכום הסבב')}<main class="screen summary">
-    <div class="big-score">${msg}</div>
-    <p class="score-line">ענית נכון על <b>${ok}</b> מתוך <b>${n}</b> שאלות${first < ok ? ` (${first} בניסיון הראשון)` : ''}.</p>
-    <ol class="sum-list">${p.questions.map((q, i) => `<li class="sum-${res[i]}"><span class="mark">${res[i] === 'fail' ? '✗' : '✓'}</span> ${topicById(q.topic).name}${res[i] === 'second' ? ' – בניסיון השני' : ''}</li>`).join('')}</ol>
+    <div class="result-hero">${friend('puppy', ok >= n - 1 ? 'cheer' : 'wave', 84, true)}<div><div class="big-score">${msg}</div>
+    <p class="score-line">ענית נכון על <b>${ok}</b> מתוך <b>${n}</b> שאלות${first < ok ? ` (${first} בניסיון הראשון)` : ''}.</p></div></div>
+    <ol class="sum-list">${p.questions.map((q, i) => `<li class="sum-${res[i]}"><span class="mark">${res[i] === 'fail' ? '✗' : '✓'}</span><span>${topicById(q.topic).name}${res[i] === 'second' ? ' · בניסיון השני' : res[i] === 'fail' ? ' · כדאי לחזור על זה' : ''}</span></li>`).join('')}</ol>
     <div class="col">
       ${btn('again', 'סבב נוסף', 'btn btn-primary btn-wide')}
       ${p.mode === 'topic' ? btn('open-topic', 'להסבר ולדוגמה', 'btn btn-wide', `data-topic="${p.topic}"`) : ''}
@@ -390,12 +427,13 @@ function examView(): string {
   const answered = (i: number) => e.questions[i].parts.every((p, pi) => isFilled(p, e.answers[i][pi]));
   if (e.confirm) {
     const missing = e.answers.map((_, i) => i).filter((i) => !answered(i));
-    return `${header('מבחן לדוגמה', null)}<main class="screen"><div class="confirm">
+    return `${header('מבחן לדוגמה', null, modeIcon('exam', 28))}<main class="screen"><div class="confirm">
+      ${friend('bunny', 'think', 66, true)}
       <h2>להגיש את המבחן?</h2>
       ${missing.length ? `<p>עוד לא ענית על ${missing.length === 1 ? 'שאלה' : 'השאלות'}: ${missing.map((i) => i + 1).join(', ')}.</p>` : '<p>ענית על כל השאלות. אחרי ההגשה תראי את התוצאות והפתרונות.</p>'}
       <div class="col">${btn('exam-submit-yes', 'כן, להגיש', 'btn btn-primary btn-wide')}${btn('exam-cancel', 'לא, אני רוצה לחזור לשאלות', 'btn btn-wide')}</div></div></main>`;
   }
-  let h = `${header('מבחן לדוגמה')}<main class="screen exam">
+  let h = `${header('מבחן לדוגמה', 'home', modeIcon('exam', 28))}<main class="screen exam">
     ${progressBar(e.index, n)}
     <nav class="exam-nav" aria-label="מעבר בין שאלות">${e.questions.map((_, i) =>
       `<button class="qchip${i === e.index ? ' current' : ''}${answered(i) ? ' answered' : ''}" data-act="exam-go" data-i="${i}" aria-label="שאלה ${i + 1}${answered(i) ? ', נענתה' : ''}">${i + 1}</button>`).join('')}</nav>
@@ -409,16 +447,16 @@ function examView(): string {
     } else if (part.kind === 'fields') {
       h += fieldRows(part, splitFields(val, part.fields!.length), (i) => `data-exam-field="${pi}:${i}"`) + (part.fieldHint ? `<div class="field-hint">${part.fieldHint}</div>` : '');
     } else {
-      h += `<div class="${choiceGridClass(q, pi)}" role="group">` + part.choices!.map((c) =>
-        `<button type="button" class="choice${val === c.id ? ' selected' : ''}" aria-pressed="${val === c.id}" data-act="exam-choose" data-part="${pi}" data-choice="${c.id}">${val === c.id ? '<span class="mark">●</span>' : ''}<span class="choice-body">${c.html}</span></button>`).join('') + `</div>`;
+      h += `<div class="${choiceGridClass(q, pi)}" role="group" aria-label="אפשרויות תשובה">` + part.choices!.map((c) =>
+        `<button type="button" class="choice${val === c.id ? ' selected' : ''}" aria-pressed="${val === c.id}" data-act="exam-choose" data-part="${pi}" data-choice="${c.id}"><span class="choice-body">${c.html}</span>${val === c.id ? '<span class="mark">● נבחר</span>' : ''}</button>`).join('') + `</div>`;
     }
     h += `</div>`;
   });
   h += `</div><div class="exam-buttons">
       ${e.index > 0 ? btn('exam-prev', '→ הקודמת', 'btn') : '<span></span>'}
-      ${e.index < n - 1 ? btn('exam-next', 'הבאה ⟵', 'btn btn-primary') : btn('exam-submit', 'להגשת המבחן', 'btn btn-primary')}
+      ${e.index < n - 1 ? btn('exam-next', `הבאה ${arrowL}`, 'btn btn-primary') : btn('exam-submit', 'להגשת המבחן', 'btn btn-primary')}
     </div>
-    ${e.index < n - 1 ? `<div class="submit-row">${btn('exam-submit', 'להגשת המבחן', 'btn btn-ghost btn-small')}</div>` : ''}
+    ${e.index < n - 1 ? `<div class="submit-row">${btn('exam-submit', 'להגשת המבחן', 'btn-link')}</div>` : ''}
   </main>`;
   return h;
 }
@@ -438,12 +476,12 @@ function examResultsView(): string {
   const n = e.questions.length;
   const pct = Math.round((ok / n) * 100);
   return `${header('תוצאות המבחן')}<main class="screen results">
-    <div class="big-score">${ok} מתוך ${n} <small>(${pct}%)</small></div>
-    <p class="score-line">${pct >= 90 ? 'מצוין! את מוכנה 🌟' : pct >= 70 ? 'יפה מאוד! עוד קצת תרגול בנושאים המסומנים 💪' : 'כדאי לתרגל את הנושאים המסומנים – את יכולה! 💪'}</p>
-    <table class="by-topic"><caption>תוצאה לפי נושא</caption><thead><tr><th>נושא</th><th>נכון</th><th></th></tr></thead><tbody>
-    ${examTopicRows(e).map((r) => `<tr class="${r.ok < r.total ? 'has-mistakes' : ''}"><td>${topicById(r.topic).icon} ${topicById(r.topic).name}</td>
-      <td class="nowrap">${r.ok < r.total ? '✗' : '✓'} ${r.ok}/${r.total}</td>
-      <td class="row-actions">${r.ok < r.total ? btn('results-practice', 'תרגול נוסף', 'btn btn-small btn-primary', `data-topic="${r.topic}"`) : ''}${btn('results-lesson', 'הסבר', 'btn btn-small btn-ghost', `data-topic="${r.topic}"`)}</td></tr>`).join('')}
+    <div class="result-hero">${friend('kitten', pct >= 70 ? 'cheer' : 'wave', 84, true)}<div><div class="big-score">${ok} מתוך ${n} <small>(${pct}%)</small></div>
+    <p class="score-line">${pct >= 90 ? 'מצוין! את מוכנה.' : pct >= 70 ? 'יפה מאוד! עוד קצת תרגול בנושאים המסומנים.' : 'כדאי לתרגל את הנושאים המסומנים – את יכולה!'}</p></div></div>
+    <table class="by-topic"><caption>תוצאה לפי נושא</caption><thead><tr><th>נושא</th><th>נכון</th><th><span class="sr">פעולות</span></th></tr></thead><tbody>
+    ${examTopicRows(e).map((r) => `<tr class="${r.ok < r.total ? 'has-mistakes' : 'all-ok'}"><td><span class="row-topic">${topicIcon(r.topic, 24)}${topicById(r.topic).name}</span></td>
+      <td class="nowrap score-cell">${r.ok < r.total ? '✗' : '✓'} ${r.ok}/${r.total}</td>
+      <td class="row-actions">${r.ok < r.total ? btn('results-practice', 'תרגול נוסף', 'btn btn-small btn-primary', `data-topic="${r.topic}"`) : ''}${btn('results-lesson', 'הסבר', 'btn btn-small', `data-topic="${r.topic}"`)}</td></tr>`).join('')}
     </tbody></table>
     <div class="col">${btn('review', 'לצפייה בפתרונות', 'btn btn-primary btn-wide')}${btn('start-exam', 'מבחן חדש', 'btn btn-wide')}${btn('home', 'למסך הבית', 'btn btn-wide')}</div>
   </main>`;
@@ -466,7 +504,7 @@ function reviewView(): string {
   const e = state.exam!;
   return `${header('פתרונות המבחן', 'back-to-results')}<main class="screen review">
   ${e.questions.map((q, i) => `<article class="rev ${e.correct![i] ? 'rev-ok' : 'rev-bad'}">
-    <h2><span class="mark">${e.correct![i] ? '✓' : '✗'}</span> שאלה ${i + 1} · ${topicById(q.topic).name}</h2>
+    <h2><span class="mark">${e.correct![i] ? '✓ נכון' : '✗ לא נכון'}</span> שאלה ${i + 1} · ${topicById(q.topic).name}</h2>
     ${questionHead(q)}
     ${q.parts.map((part, pi) => `<div class="rev-part">${part.prompt ? `<div class="part-prompt">${part.prompt}</div>` : ''}
       <div>התשובה שלך: ${answerHtml(q, pi, e.answers[i][pi])} ${isCorrectAnswer(q, pi, e.answers[i][pi]) ? '✓' : '✗'}</div>
@@ -484,7 +522,7 @@ export function render() {
   switch (s.name) {
     case 'home': html = homeView(); break;
     case 'topics': html = topicsView(); break;
-    case 'lesson': html = lessonView(s.topic, s.from); break;
+    case 'lesson': html = lessonView(s.topic, s.from, s.step ?? 0); break;
     case 'practice': html = state.practice ? practiceView() : homeView(); break;
     case 'summary': html = state.practice ? summaryView() : homeView(); break;
     case 'exam': html = state.exam ? examView() : homeView(); break;
@@ -524,6 +562,11 @@ function onClick(ev: Event) {
     case 'back-to-results': go({ name: 'examResults' }); break;
     case 'choose': answer(el.dataset.key!, Number(el.dataset.part), el.dataset.choice!); break;
     case 'bay': openBay(el); break;
+    case 'lesson-step': {
+      const sc = state.screen;
+      if (sc.name === 'lesson') { const n = lessonSteps(sc.topic).length; go({ ...sc, step: Math.max(0, Math.min(n - 1, Number(el.dataset.step))) }); }
+      break;
+    }
     case 'retry-lesson': delete state.lessonTry[el.dataset.key!]; save(); render(); break;
     case 'next-q': {
       const p = state.practice!;

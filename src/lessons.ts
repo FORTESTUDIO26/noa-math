@@ -5,8 +5,8 @@
 import type { Question, TopicId, Part } from './types';
 import { m, X, D, MINUS, BLANK, mathChoice, textChoice } from './format';
 import { numberLine, sequenceFigure, groupsFigure, angleFigure, polygonFigure, triangleFigure } from './figures';
-import { cargoBays } from './space';
-import { qFields, qPlaceText, qValueText } from './generators/place';
+import { drawers as cargoBays, bowlGroups } from './club';
+import { qFields, qPlaceChoice, qValueChoice } from './generators/place';
 import { fmt, placeName, digitsOf } from './format';
 import { CONFIG } from './config';
 import { ANGLE_NAMES, angleTypes, TRI_NAMES, triangleOptions, polygonSides } from './generators/geometry';
@@ -67,13 +67,13 @@ export function buildLessons(): Record<TopicId, Lesson> {
       skills: [
         {
           title: 'פירוק לאלפים, מאות, עשרות ויחידות',
-          explain: 'כל ספרה נכנסת לתא המטען שלה בחללית: אלפים, מאות, עשרות או יחידות. בפירוק כותבים בכל שורה את הספרה של אותו תא, ואם התא ריק – כותבים 0.',
+          explain: 'כל ספרה נכנסת למגירה שלה בשידה של הארנבת: אלפים, מאות, עשרות או יחידות. בפירוק כותבים בכל שורה את הספרה של אותה מגירה, ואם המגירה ריקה – כותבים 0.',
           example: {
             task: 'פרקי את המספר 7639.',
-            figure: cargoBays(7639, { interactive: true, highlight: 1, id: 'pv-ex', prompt: 'לחצי על התא של 3 עשרות (מסומן בחץ) ותראי מה יש בו' }) + notebookRows(7639),
+            figure: cargoBays(7639, { interactive: true, highlight: 1, id: 'pv-ex', prompt: 'לחצי על מגירת העשרות (מסומנת בחץ) – הארנבת תפתח אותה' }) + notebookRows(7639),
             steps: [
               'מעבירים כל ספרה לשורה שלה: 7 אלפים, 6 מאות, 3 עשרות ו־9 יחידות.',
-              `כמה שווה כל תא? בתא העשרות יש 3 חבילות של 10: ${m('10 + 10 + 10 = 30')}.`,
+              `כמה שווה כל מגירה? הארנבת פותחת את מגירת העשרות: 3 חבילות של 10, ${m('10 + 10 + 10 = 30')}.`,
               `באותו אופן: 7 אלפים הם ${m('7,000')}, ו־6 מאות הן ${m('600')}.`,
             ],
             answer: `לפי ערכים: ${m('7,639 = 7,000 + 600 + 30 + 9')}`,
@@ -82,11 +82,11 @@ export function buildLessons(): Record<TopicId, Lesson> {
         },
         {
           title: 'הרכבת מספר',
-          explain: 'כותבים ספרה אחת לכל תא, לפי הסדר: אלפים, מאות, עשרות, יחידות. אם תא ריק – כותבים בו 0.',
+          explain: 'כותבים ספרה אחת לכל מגירה, לפי הסדר: אלפים, מאות, עשרות, יחידות. אם מגירה ריקה – כותבים בה 0.',
           example: {
             task: 'לכתוב את המספר: 2 אלפים, 4 עשרות ו־9 יחידות',
             figure: cargoBays(2049, { highlight: 2 }),
-            steps: ['אלפים: 2. מאות: אין – התא ריק, כותבים 0 (מסומן בחץ).', 'עשרות: 4. יחידות: 9.'],
+            steps: ['אלפים: 2. מאות: אין – המגירה ריקה, כותבים 0 (מסומנת בחץ).', 'עשרות: 4. יחידות: 9.'],
             answer: m('2,049'),
           },
           tryIt: tq('placeValue', 'pv2', 'כתבי את המספר: <b>5 אלפים, 3 מאות ו־8 יחידות</b>.', [num(5308, 'אין עשרות במספר. מה כותבים במקום העשרות?')],
@@ -101,25 +101,25 @@ export function buildLessons(): Record<TopicId, Lesson> {
       skills: [
         {
           title: 'באיזה מקום נמצאת הספרה?',
-          explain: 'המקום הוא השם של תא המטען: יחידות, עשרות, מאות או אלפים. מתחילים מימין – הספרה הימנית היא היחידות. את התשובה כותבים במילה.',
+          explain: 'המקום הוא השם של המגירה: יחידות, עשרות, מאות או אלפים. מתחילים מימין – הספרה הימנית היא היחידות.',
           example: {
             task: 'באיזה מקום נמצאת הספרה 3 במספר 7639?',
             figure: cargoBays(7639, { highlight: 1 }),
-            steps: ['מתחילים מימין: 9 ביחידות, 3 בעשרות, 6 במאות, 7 באלפים.', 'הספרה 3 נמצאת בתא העשרות (מסומן בחץ).'],
+            steps: ['מתחילים מימין: 9 ביחידות, 3 בעשרות, 6 במאות, 7 באלפים.', 'הספרה 3 נמצאת במגירת העשרות (מסומנת בחץ).'],
             answer: 'התשובה: <b>עשרות</b> – זה המקום.',
           },
-          tryIt: lessonQ(qPlaceText('digitValue', 1, 2514, 2), 'dv1'),
+          tryIt: lessonQ(qPlaceChoice('digitValue', 1, 2514, 2), 'dv1'),
         },
         {
           title: 'מה הערך של הספרה?',
-          explain: 'הערך הוא כמה הספרה שווה במקום שלה. קודם מוצאים את המקום, ואחר כך סופרים את החבילות שבתא.',
+          explain: 'הערך הוא כמה הספרה שווה במקום שלה. קודם מוצאים את המקום, ואחר כך סופרים את החבילות שבמגירה.',
           example: {
             task: 'מה הערך של הספרה 3 במספר 7639?',
-            figure: cargoBays(7639, { interactive: true, highlight: 1, id: 'dv-ex', prompt: 'לחצי על התא של 3 עשרות' }),
-            steps: ['הספרה 3 נמצאת במקום העשרות.', `בתא העשרות יש 3 חבילות של 10: ${m('3 × 10 = 30')}.`],
+            figure: cargoBays(7639, { interactive: true, highlight: 1, id: 'dv-ex', prompt: 'לחצי על מגירת העשרות' }),
+            steps: ['הספרה 3 נמצאת במקום העשרות.', `הארנבת פותחת את מגירת העשרות: יש בה 3 חבילות של 10, ${m('3 × 10 = 30')}.`],
             answer: 'המקום הוא <b>עשרות</b>, והערך הוא <b>30</b>.',
           },
-          tryIt: lessonQ(qValueText('digitValue', 1, 473, 1), 'dv2', {
+          tryIt: lessonQ(qValueChoice('digitValue', 1, 473, 1), 'dv2', {
             hint: 'התחילי מימין. הספרה הראשונה היא ספרת היחידות. באיזה מקום נמצאת הספרה 7?',
             hintFigure: cargoBays(473, { highlight: 1, open: 1 }),
           }),
@@ -187,7 +187,8 @@ export function buildLessons(): Record<TopicId, Lesson> {
           explain: `כפל הוא חיבור של אותו מספר כמה פעמים. ${m(`4 ${X} 6`)} פירושו 4 פעמים 6. אפשר להיעזר בתרגיל שכבר יודעים.`,
           example: {
             task: m(`4 ${X} 6 = ${BLANK}`),
-            steps: [`4 פעמים 6: ${m('6 + 6 + 6 + 6')}.`, `או: ${m(`2 ${X} 6 = 12`)}, ופעמיים 12 זה 24.`],
+            figure: bowlGroups(4, 6, { numbered: true }),
+            steps: [`הכלבלב שם 6 חטיפים בכל אחת מ־4 קערות: ${m('6 + 6 + 6 + 6')}.`, `או: ${m(`2 ${X} 6 = 12`)}, ופעמיים 12 זה 24.`],
             answer: m(`4 ${X} 6 = 24`),
           },
           tryIt: tq('multDiv', 'md1', 'פתרי את התרגיל.', [num(21, 'חברי 7 שלוש פעמים: 7 + 7 + 7.')],
@@ -198,7 +199,8 @@ export function buildLessons(): Record<TopicId, Lesson> {
           explain: `חילוק הוא הפעולה ההפוכה לכפל. כדי לפתור ${m(`24 ${D} 6`)} שואלים: 6 כפול כמה שווה 24?`,
           example: {
             task: m(`24 ${D} 6 = ${BLANK}`),
-            steps: [`שואלים: ${m(`6 ${X} ${BLANK} = 24`)}.`, `${m(`6 ${X} 4 = 24`)}.`],
+            figure: bowlGroups(6, 4, { numbered: true }),
+            steps: [`הכלבלב מחלק 24 חטיפים ל־6 קערות שווה בשווה. שואלים: ${m(`6 ${X} ${BLANK} = 24`)}.`, `${m(`6 ${X} 4 = 24`)} – בכל קערה 4 חטיפים.`],
             answer: m(`24 ${D} 6 = 4`),
           },
           tryIt: tq('multDiv', 'md2', 'פתרי את תרגיל החילוק.', [num(6, 'חשבי: 7 כפול כמה שווה 42?')],
@@ -285,15 +287,15 @@ export function buildLessons(): Record<TopicId, Lesson> {
           explain: 'בציור של כפל יש קבוצות שוות. סופרים כמה קבוצות יש, וכמה יש בכל קבוצה. התרגיל: מספר הקבוצות × כמה בכל קבוצה.',
           example: {
             task: 'איזה תרגיל מתאים לציור?',
-            figure: groupsFigure([4, 4, 4], { numbered: true, perLabel: true, item: 'robot' }),
-            steps: ['סופרים חלליות: 3 קבוצות (המספר מעל כל מסגרת).', 'בכל קבוצה 4 רובוטים (המספר מתחת לכל מסגרת).'],
+            figure: groupsFigure([4, 4, 4], { numbered: true, perLabel: true, item: 'treat' }),
+            steps: ['סופרים סלים: 3 קבוצות (המספר מעל כל סל).', 'בכל סל 4 חטיפים (המספר מתחת לכל סל).'],
             answer: `התרגיל: ${m(`3 ${X} 4 = 12`)}.`,
           },
           tryIt: (() => {
             const { choices, answer } = fixedChoices(mathChoice(`5 ${X} 2`), [mathChoice('5 + 2'), mathChoice(`2 ${X} 2`), mathChoice(`5 ${X} 5`)], 2);
-            return tq('multMeaning', 'mm1', 'איזה תרגיל מתאים לציור?', [{ kind: 'choice', choices, answer, hint: 'כמה מסגרות (קבוצות) יש? וכמה רובוטים בכל קבוצה?' }],
-              `יש 5 קבוצות, ובכל אחת 2 רובוטים. התרגיל: ${m(`5 ${X} 2 = 10`)}.`,
-              { figure: groupsFigure([2, 2, 2, 2, 2], { item: 'robot' }) });
+            return tq('multMeaning', 'mm1', 'איזה תרגיל מתאים לציור?', [{ kind: 'choice', choices, answer, hint: 'כמה סלים (קבוצות) יש? וכמה חטיפים בכל סל?' }],
+              `יש 5 קבוצות, ובכל אחת 2 חטיפים. התרגיל: ${m(`5 ${X} 2 = 10`)}.`,
+              { figure: groupsFigure([2, 2, 2, 2, 2], { item: 'treat' }) });
           })(),
         },
       ],

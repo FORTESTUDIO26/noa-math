@@ -1,7 +1,7 @@
 import { CONFIG } from '../config';
 import type { Level, Question } from '../types';
 import type { Rng } from '../rng';
-import { makeChoices, textChoice } from '../format';
+import { makeChoices, textChoice, orderedChoices } from '../format';
 import { angleFigure, polygonFigure, polygonPoints, nonPolygonFigure, triangleFigure, minAngleDeg } from '../figures';
 
 /* ============================================================ זוויות */
@@ -31,9 +31,7 @@ const angleRule = 'זווית חדה קטנה מזווית ישרה (פינה ש
 
 function nameChoices(correct: AngleType) {
   const types = angleTypes();
-  const { choices, answer } = makeChoices(null, textChoice(ANGLE_NAMES[correct]), types.filter((t) => t !== correct).map((t) => textChoice(ANGLE_NAMES[t])));
-  choices.sort((a, b) => types.findIndex((t) => ANGLE_NAMES[t] === a.text) - types.findIndex((t) => ANGLE_NAMES[t] === b.text));
-  return { choices, answer };
+  return orderedChoices(types.map((t) => textChoice(ANGLE_NAMES[t])), types.indexOf(correct));
 }
 
 export function angles(rng: Rng, level: Level): Question {
@@ -48,7 +46,7 @@ export function angles(rng: Rng, level: Level): Question {
       topic, level, sig: `an-name-${t}-${deg}-${rot}`,
       prompt: 'איזו זווית מסומנת בציור?',
       figure: angleFigure({ deg, rot }),
-      parts: [{ kind: 'choice', choices, answer, hint: angleHint }],
+      parts: [{ kind: 'choice', choices, answer, fixedOrder: true, hint: angleHint }],
       explanation: `${angleRule} הזווית בציור היא <b>${ANGLE_NAMES[t]}</b>.`,
     };
   }
@@ -76,7 +74,7 @@ export function angles(rng: Rng, level: Level): Question {
     topic, level, sig: `an-tri-${t}-${deg}-${rot}`,
     prompt: 'איזו זווית מסומנת במשולש? (הזווית עם הסימון)',
     figure: angleFigure({ deg, rot, closed: true, len1: rng.int(80, 120), len2: rng.int(80, 120) }),
-    parts: [{ kind: 'choice', choices, answer, hint: 'הסתכלי רק על הזווית המסומנת. ' + angleHint }],
+    parts: [{ kind: 'choice', choices, answer, fixedOrder: true, hint: 'הסתכלי רק על הזווית המסומנת. ' + angleHint }],
     explanation: `${angleRule} הזווית המסומנת היא <b>${ANGLE_NAMES[t]}</b>. סיבוב הצורה לא משנה את סוג הזווית.`,
   };
 }
@@ -107,14 +105,12 @@ export function polygons(rng: Rng, level: Level): Question {
   if (level === 2) {
     const n = rng.pick(sides);
     const pts = polygonPoints(rng, n, true, rng.int(60, 100));
-    const others = rng.sample(sides.filter((s) => s !== n), Math.min(3, sides.length - 1));
-    const { choices, answer } = makeChoices(null, textChoice(pname(n)), others.map((s) => textChoice(pname(s))));
-    choices.sort((a, b) => sides.findIndex((s) => pname(s) === a.text) - sides.findIndex((s) => pname(s) === b.text));
+    const { choices, answer } = orderedChoices(sides.map((s) => textChoice(pname(s))), sides.indexOf(n));
     return {
       topic, level, sig: `pg-name-${n}-${Math.round(pts[0].x)}`,
       prompt: 'מה שם המצולע?',
       figure: polygonFigure(pts),
-      parts: [{ kind: 'choice', choices, answer, hint: countHint + ' השם תלוי במספר הצלעות.' }],
+      parts: [{ kind: 'choice', choices, answer, fixedOrder: true, hint: countHint + ' השם תלוי במספר הצלעות.' }],
       explanation: `יש ${n} צלעות, ולכן זה <b>${pname(n)}</b>. ${sides.map((s) => `${s} – ${pname(s)}`).join(', ')}.`,
     };
   }
@@ -187,8 +183,7 @@ export function triangles(rng: Rng, level: Level): Question {
     const t = rng.pick(types);
     const s = makeTriangle(rng, t);
     const opts = triangleOptions(t);
-    const { choices, answer } = makeChoices(null, textChoice(TRI_NAMES[t]), opts.filter((o) => o !== t).map((o) => textChoice(TRI_NAMES[o])));
-    choices.sort((a, b) => opts.findIndex((o) => TRI_NAMES[o] === a.text) - opts.findIndex((o) => TRI_NAMES[o] === b.text));
+    const { choices, answer } = orderedChoices(opts.map((o) => textChoice(TRI_NAMES[o])), opts.indexOf(t));
     const lens = `${s[2]}, ${s[0]} ו־${s[1]}`;
     const eqNote = t === 'equilateral' && CONFIG.equilateralCountsAsIsosceles ? ' (משולש שווה־צלעות הוא גם שווה־שוקיים, אבל השם המדויק שלו הוא שווה־צלעות.)' : '';
     if (level === 1) {
@@ -196,14 +191,14 @@ export function triangles(rng: Rng, level: Level): Question {
         topic, level, sig: `tr-fig-${t}-${s.join('')}`,
         prompt: 'איזה משולש זה? (אורכי הצלעות בס״מ. קו קטן על צלע מסמן צלעות שוות.)',
         figure: triangleFigure({ sides: s, rot: rng.int(0, 71) * 5, lengths: true, ticks: true }),
-        parts: [{ kind: 'choice', choices, answer, hint: 'השווי את שלושת המספרים. כמה צלעות שוות יש?' }],
+        parts: [{ kind: 'choice', choices, answer, fixedOrder: true, hint: 'השווי את שלושת המספרים. כמה צלעות שוות יש?' }],
         explanation: `אורכי הצלעות: ${lens} ס״מ. ${triRule} לכן זה משולש <b>${TRI_NAMES[t]}</b>.${eqNote}`,
       };
     }
     return {
       topic, level, sig: `tr-txt-${t}-${s.join('')}`,
       prompt: `למשולש יש צלעות באורך <b>${s[2]} ס״מ, ${s[0]} ס״מ ו־${s[1]} ס״מ</b>. איזה משולש הוא?`,
-      parts: [{ kind: 'choice', choices, answer, hint: 'חפשי מספרים שחוזרים על עצמם. כמה צלעות באותו אורך?' }],
+      parts: [{ kind: 'choice', choices, answer, fixedOrder: true, hint: 'חפשי מספרים שחוזרים על עצמם. כמה צלעות באותו אורך?' }],
       explanation: `${triRule} כאן: ${lens} ס״מ – ולכן זה משולש <b>${TRI_NAMES[t]}</b>.${eqNote}`,
     };
   }

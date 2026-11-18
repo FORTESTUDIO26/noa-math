@@ -85,7 +85,11 @@ export const splitFields = (given: string | undefined, n: number): string[] => {
 
 export function checkPart(part: Part, given: string | undefined): CheckResult {
   const g = given ?? '';
-  if (part.kind === 'choice') return { ok: g !== '' && g === part.answer, empty: g === '' };
+  if (part.kind === 'choice') {
+    const ok = g !== '' && g === part.answer;
+    const chosen = part.choices?.find((c) => c.id === g)?.text;
+    return { ok, empty: g === '', trap: ok || !chosen ? undefined : findTrap(part, chosen) };
+  }
   if (part.kind === 'number') {
     if (g.trim() === '') return { ok: false, empty: true };
     const n = normalizeNumber(g);

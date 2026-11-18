@@ -66,3 +66,16 @@ export function digitsOf(n: number): number[] {
   // index 0 = units
   return String(n).split('').reverse().map(Number);
 }
+
+/** Choices in a fixed, logical order (ids follow the on-screen position). */
+export function orderedChoices(items: { html: string; text: string; isFigure?: boolean }[], correctIndex: number): { choices: Choice[]; answer: string; fixedOrder: true } {
+  const seen = new Set(items.map((i) => i.text));
+  if (seen.size !== items.length) throw new Error('duplicate choice');
+  const ids = 'abcdefgh';
+  return { choices: items.map((c, i) => ({ id: ids[i], ...c })), answer: ids[correctIndex], fixedOrder: true };
+}
+
+/** "אלפים, מאות, עשרות, יחידות" – only the places the number really has */
+export function placeOrder(places: number): number[] {
+  return [3, 2, 1, 0].filter((p) => p < places);
+}

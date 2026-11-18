@@ -1,8 +1,9 @@
 import { CONFIG } from '../config';
 import type { Level, Question, Part } from '../types';
 import type { Rng } from '../rng';
-import { fmt, m, X, D, MINUS, BLANK, makeChoices, mathChoice, textChoice } from '../format';
+import { fmt, m, X, D, MINUS, BLANK, makeChoices, mathChoice, textChoice, orderedChoices } from '../format';
 import { numberLine, sequenceFigure, groupsFigure } from '../figures';
+import { bowlGroups } from '../club';
 
 const T = CONFIG.timesTableMax;
 const MAXN = CONFIG.maxNumber;
@@ -57,12 +58,11 @@ export function evenOdd(rng: Rng, level: Level): Question {
   if (level === 1) {
     const n = rng.int(11, 999);
     const even = n % 2 === 0;
-    const { choices, answer } = makeChoices(null, textChoice(even ? EVEN : ODD), [textChoice(even ? ODD : EVEN)]);
-    choices.sort((a, b) => (a.text === EVEN ? 0 : 1) - (b.text === EVEN ? 0 : 1));
+    const { choices, answer } = orderedChoices([textChoice(EVEN), textChoice(ODD)], even ? 0 : 1);
     return {
       topic, level, sig: `eo-is-${n}`,
       prompt: `האם המספר <b>${fmt(n)}</b> זוגי או אי־זוגי?`,
-      parts: [{ kind: 'choice', choices, answer, hint }],
+      parts: [{ kind: 'choice', choices, answer, fixedOrder: true, hint }],
       explanation: `ספרת היחידות היא ${n % 10}. ${n % 10} ${even ? 'זוגי' : 'אי־זוגי'}, ולכן ${m(fmt(n))} ${even ? 'זוגי' : 'אי־זוגי'}.`,
     };
   }
@@ -106,6 +106,7 @@ export function multDiv(rng: Rng, level: Level): Question {
         prompt: 'פתרי את התרגיל.',
         math: `${a} ${X} ${b} = ${BLANK}`,
         parts: [num(a * b, `${a} ${X} ${b} זה ${a} פעמים ${b}. אפשר לחבר: ${Array(a).fill(b).join(' + ')}.`)],
+        hintFigure: a <= 6 && b <= 9 ? bowlGroups(a, b) : undefined,
         explanation: `${m(`${a} ${X} ${b}`)} פירושו ${a} פעמים ${b}: ${m(Array(a).fill(b).join(' + ') + ' = ' + a * b)}.`,
       };
     }
@@ -167,6 +168,7 @@ function divQ(rng: Rng, level: Level, divisor: number, quotient: number): Questi
     prompt: 'פתרי את תרגיל החילוק.',
     math: `${c} ${D} ${d} = ${BLANK}`,
     parts: [num(quotient, `חשבי בכפל: ${d} כפול כמה שווה ${c}?`)],
+    hintFigure: d <= 6 && quotient <= 9 ? bowlGroups(d, quotient) : undefined,
     explanation: `שואלים: ${m(`${d} ${X} ${BLANK} = ${c}`)}. ${m(`${d} ${X} ${quotient} = ${c}`)}, לכן ${m(`${c} ${D} ${d} = ${quotient}`)}.`,
   };
 }
@@ -317,7 +319,7 @@ export function sequences(rng: Rng, level: Level): Question {
 /* ============================================================ משמעות הכפל */
 
 const ITEMS = [
-  { one: 'רובוטים', fig: 'robot' as const },
+  { one: 'חטיפים', fig: 'treat' as const },
 ];
 
 export function multMeaning(rng: Rng, level: Level): Question {

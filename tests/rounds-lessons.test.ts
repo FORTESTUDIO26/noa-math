@@ -110,19 +110,22 @@ describe('"איך עושים את זה?" cards', () => {
     }
   });
 
-  it('digit-value card: place vs value on the same number 7639, then "עכשיו תורך"', () => {
+  it('digit-value card: place vs value on the same number 7639, then "עכשיו תורך" as choices', () => {
     const [place, value] = L.digitValue.skills;
     expect(place.example.task).toContain('7639');
     expect(place.example.answer).toContain('עשרות');
     expect(value.example.task).toContain('7639');
     expect(value.example.answer).toContain('30');
     expect(value.example.figure).toContain('data-act="bay"'); // clickable cargo bay
-    expect(place.tryIt.parts[0].kind).toBe('text');
+    const p0 = place.tryIt.parts[0];
+    expect(p0.kind).toBe('choice');
+    expect(p0.choices!.find((c) => c.id === p0.answer)!.text).toBe('מאות');
     expect(value.tryIt.prompt).toContain('473');
-    expect(checkPart(value.tryIt.parts[0], 'שבעים').ok).toBe(true);
-    expect(checkPart(value.tryIt.parts[0], '7 עשרות').ok).toBe(true);
-    expect(checkPart(value.tryIt.parts[0], 'עשרות').trap).toBe('מצאת את המקום. כמה הן 7 עשרות?');
-    expect(value.tryIt.parts[0].hint).toBe('התחילי מימין. הספרה הראשונה היא ספרת היחידות. באיזה מקום נמצאת הספרה 7?');
+    const v0 = value.tryIt.parts[0];
+    expect(v0.choices!.map((c) => c.text)).toEqual(['7', '70', '700']);
+    expect(v0.choices!.find((c) => c.id === v0.answer)!.text).toBe('70');
+    expect(checkPart(v0, v0.choices![0].id).trap).toContain('הספרה עצמה');
+    expect(v0.hint).toBe('התחילי מימין. הספרה הראשונה היא ספרת היחידות. באיזה מקום נמצאת הספרה 7?');
   });
 
   it('place-value card: 4-box decomposition of 7639 with clickable bays, try-it 7052 with a 0', () => {

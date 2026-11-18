@@ -4,7 +4,7 @@
  */
 import { fmt, esc, placeName, digitsOf } from './format';
 import type { Rng } from './rng';
-import { robotItem } from './space';
+import { treat, friendAt } from './club';
 
 type Pt = { x: number; y: number };
 const r1 = (v: number) => Math.round(v * 10) / 10;
@@ -37,17 +37,20 @@ export function numberLine(o: NumberLineOpts): string {
   const longest = fmt(o.start + o.step * (o.count - 1)).length;
   const fs = longest >= 5 ? 13 : 15;
   let b = '';
-  // space track: a rail with stations at equal distances
+  // a garden path with stepping stones at equal distances
   b += `<line x1="6" y1="${y}" x2="${W - 4}" y2="${y}" class="nl-rail"/>`;
   b += `<line x1="6" y1="${y}" x2="${W - 4}" y2="${y}" class="nl-line"/>`;
   b += `<path d="M${W - 4} ${y} l-11 -6 v12 z" class="nl-arrow"/>`;
   for (let i = 0; i < o.count; i++) {
-    b += `<circle cx="${X(i)}" cy="${y}" r="${i === o.unknown ? 9 : 7}" class="nl-station${i === o.unknown ? ' nl-station-q' : ''}"/>`;
+    b += `<ellipse cx="${X(i)}" cy="${y}" rx="${i === o.unknown ? 14 : 12.5}" ry="${i === o.unknown ? 8 : 7}" class="nl-station${i === o.unknown ? ' nl-station-q' : ''}"/>`;
   }
+  // the kitten sits on the first stone that has a number
+  const kStone = o.labeled[0] ?? 0;
+  b += friendAt('kitten', 'happy', X(kStone) - 20, y - 46, 40, true);
   for (let i = 0; i < o.count; i++) {
     const v = o.start + i * o.step;
     const isUnknown = i === o.unknown;
-    b += `<line x1="${X(i)}" y1="${y - 11}" x2="${X(i)}" y2="${y + 11}" class="nl-tick${isUnknown ? ' nl-tick-q' : ''}"/>`;
+    b += `<line x1="${X(i)}" y1="${y + 8}" x2="${X(i)}" y2="${y + 15}" class="nl-tick${isUnknown ? ' nl-tick-q' : ''}"/>`;
     if (isUnknown) {
       const w = Math.max(30, fs * 0.62 * longest + 10);
       b += `<rect x="${r1(X(i) - w / 2)}" y="${y + 17}" width="${r1(w)}" height="26" rx="6" class="nl-qbox"/>`;
@@ -63,7 +66,7 @@ export function numberLine(o: NumberLineOpts): string {
       b += `<text x="${r1(xm)}" y="${y - 32}" class="nl-jlabel" font-size="12">+${fmt(o.step)}</text>`;
     }
   }
-  const label = `מסלול חלל (ישר מספרים) עם ${o.count} תחנות במרווחים שווים` + (o.unknown !== undefined ? ' ותחנה עם סימן שאלה' : '');
+  const label = `ישר מספרים: שביל עם ${o.count} אבני דריכה במרווחים שווים` + (o.unknown !== undefined ? ' ואבן עם סימן שאלה' : '');
   return svgWrap(`0 0 ${W} 110`, b, label, 'fig fig-wide');
 }
 
@@ -266,7 +269,7 @@ export function triangleFigure(o: TriangleOpts): string {
 
 /* ---------------------------------------------------------------- equal groups */
 
-export function groupsFigure(counts: number[], opts: { numbered?: boolean; perLabel?: boolean; size?: 'normal' | 'small'; item?: 'dot' | 'star' | 'robot' } = {}): string {
+export function groupsFigure(counts: number[], opts: { numbered?: boolean; perLabel?: boolean; size?: 'normal' | 'small'; item?: 'dot' | 'star' | 'treat' } = {}): string {
   const maxC = Math.max(...counts);
   const cols = maxC <= 4 ? 2 : 3;
   const rows = Math.ceil(maxC / cols);
@@ -287,8 +290,8 @@ export function groupsFigure(counts: number[], opts: { numbered?: boolean; perLa
     for (let k = 0; k < cnt; k++) {
       const x = gx + 8 + (k % cols) * cell + cell / 2;
       const y = gy + 8 + Math.floor(k / cols) * cell + cell / 2;
-      b += opts.item === 'robot'
-        ? robotItem(x, y)
+      b += opts.item === 'treat'
+        ? treat(x, y)
         : opts.item === 'star'
           ? `<path d="${starPath(x, y, 9)}" class="item"/>`
           : `<circle cx="${x}" cy="${y}" r="8" class="item"/>`;

@@ -1,44 +1,81 @@
 import { describe, it, expect } from 'vitest';
 import { Rng } from '../src/rng';
-import { checkPart, normalize } from '../src/answers';
-import { qFields, qPlaceText, qValueText, qDigitAtPlace, familyRound, LESSON_NUMBERS } from '../src/generators/place';
-import { buildTopicRound } from '../src/rounds';
+import { checkPart } from '../src/answers';
+import { qFields, qPlaceChoice, qValueChoice, qDigitAtPlace, familyRound, LESSON_NUMBERS } from '../src/generators/place';
+import { GENERATORS } from '../src/generators';
+import { TOPICS } from '../src/topics';
+import { buildLessons } from '../src/lessons';
+import { buildTopicRound, buildExam } from '../src/rounds';
 import { validateQuestion } from '../src/validate';
 import { digitsOf } from '../src/format';
 
 /** the number a question is about – it is part of the question signature */
 const subject = (sig: string) => Number(sig.match(/-(\d{4})(?:-|$)/)?.[1] ?? -1);
 
-describe('Hebrew answers', () => {
-  it('"באיזה מקום נמצאת הספרה 3 במספר 7639?" → עשרות (spaces, niqqud, prefix ok)', () => {
-    const q = qPlaceText('digitValue', 1, 7639, 1);
-    const p = q.parts[0];
-    expect(p.kind).toBe('text');
-    expect(q.prompt).toContain('7,639');
-    for (const a of ['עשרות', '  עשרות ', 'עֲשָׂרוֹת', 'העשרות', 'מקום העשרות', 'במקום  העשרות']) expect(checkPart(p, a).ok, a).toBe(true);
-    for (const a of ['מאות', 'יחידות', '30', '3', '']) expect(checkPart(p, a).ok, a).toBe(false);
-    expect(checkPart(p, '30').trap).toContain('שם המקום');
-    expect(p.fieldHint).toContain('כתבי את שם המקום');
+describe('word answers are choices', () => {
+  const textOf = (q: ReturnType<typeof qPlaceChoice>) => q.parts[0].choices!.map((c) => c.text);
+  const rightText = (q: ReturnType<typeof qPlaceChoice>) => q.parts[0].choices!.find((c) => c.id === q.parts[0].answer)!.text;
+
+  it('"באיזה מקום נמצאת הספרה 3 במספר 7639?" → choose עשרות among the 4 places', () => {
+    const q = qPlaceChoice('digitValue', 1, 7639, 1);
+    expect(q.parts[0].kind).toBe('choice');
+    expect(textOf(q)).toEqual(['אלפים', 'מאות', 'עשרות', 'יחידות']);
+    expect(rightText(q)).toBe('עשרות');
     expect(validateQuestion(q)).toEqual([]);
   });
 
-  it('"מה הערך של הספרה 3 במספר 7639?" → 30, "שלושים", "3 עשרות"', () => {
-    const q = qValueText('digitValue', 1, 7639, 1);
-    const p = q.parts[0];
-    for (const a of ['30', ' 30 ', 'שלושים', 'שְׁלוֹשִׁים', '3 עשרות', 'שלוש עשרות', '3   עשרות', 'שלשים']) expect(checkPart(p, a).ok, a).toBe(true);
-    for (const a of ['3', '300', 'עשרות', 'שלוש', '3 מאות']) expect(checkPart(p, a).ok, a).toBe(false);
-    expect(checkPart(p, 'עשרות').trap).toBe('מצאת את המקום. כמה הן 3 עשרות?');
-    expect(checkPart(p, 'העשרות').trap).toBe('מצאת את המקום. כמה הן 3 עשרות?');
+  it('"מה הערך של הספרה 3 במספר 7639?" → choose among 3, 30, 300, 3,000', () => {
+    const q = qValueChoice('digitValue', 1, 7639, 1);
+    expect(textOf(q)).toEqual(['3', '30', '300', '3,000']);
+    expect(rightText(q)).toBe('30');
+    const three = q.parts[0].choices!.find((c) => c.text === '3')!.id;
+    expect(checkPart(q.parts[0], three).trap).toContain('הספרה עצמה');
     expect(validateQuestion(q)).toEqual([]);
   });
 
-  it('values in every place accept digits and words', () => {
-    const cases: [number, number, string[]][] = [[7639, 3, ['7000', '7,000', 'שבעת אלפים', '7 אלפים']], [7639, 2, ['600', 'שש מאות', '6 מאות']], [7639, 0, ['9', 'תשע', '9 יחידות']], [2514, 2, ['500', 'חמש מאות']], [1234, 3, ['1000', 'אלף', '1 אלף']]];
-    for (const [n, pl, ok] of cases) {
-      const p = qValueText('digitValue', 1, n, pl).parts[0];
-      for (const a of ok) expect(checkPart(p, a).ok, `${n} ${pl} ${a}`).toBe(true);
+  it('only options that make sense: a 3-digit number has 3 places and 3 values', () => {
+    expect(textOf(qPlaceChoice('digitValue', 1, 473, 1))).toEqual(['מאות', 'עשרות', 'יחידות']);
+    expect(textOf(qValueChoice('digitValue', 1, 473, 1))).toEqual(['7', '70', '700']);
+  });
+
+  it('no generated question asks to type a word', () => {
+    for (const t of TOPICS) for (const lv of [1, 2, 3] as const) {
+      const rng = new Rng(t.id.length * 31 + lv);
+      for (let i = 0; i < 150; i++) {
+        const q = GENERATORS[t.id](rng, lv);
+        expect(q.parts.some((p) => p.kind === 'text'), q.sig).toBe(false);
+      }
     }
-    expect(normalize('  עֶשֶׂר־ים ')).toBe('עשר ים');
+    for (const l of Object.values(buildLessons())) for (const sk of l.skills) expect(sk.tryIt.parts.some((p) => p.kind === 'text')).toBe(false);
+  });
+
+  it('term answers (places, even/odd, angles, polygons, triangles) are buttons in a fixed logical order', () => {
+    const rng = new Rng(77);
+    const lists = new Set<string>();
+    for (const t of ['evenOdd', 'angles', 'polygons', 'triangles', 'digitValue'] as const) for (let i = 0; i < 200; i++) {
+      for (const p of GENERATORS[t](rng, ((i % 3) + 1) as 1 | 2 | 3).parts) {
+        if (p.kind === 'choice' && p.fixedOrder) lists.add(p.choices!.map((c) => c.text).join('/'));
+      }
+    }
+    expect([...lists]).toEqual(expect.arrayContaining(['זוגי/אי־זוגי', 'חדה/ישרה/קהה', 'משולש/מרובע/מחומש/משושה/מתומן', 'אלפים/מאות/עשרות/יחידות', 'שווה־צלעות/שווה־שוקיים/שונה־צלעות', 'שווה־צלעות/שונה־צלעות']));
+  });
+
+  it('in every round the correct button never sits in the same place in two choice questions in a row', () => {
+    const rng = new Rng(5);
+    for (const t of TOPICS) for (let r = 0; r < 25; r++) {
+      const qs = buildTopicRound(rng, t.id, []);
+      for (let i = 1; i < qs.length; i++) {
+        const a = qs[i - 1].parts[qs[i - 1].parts.length - 1], b = qs[i].parts[0];
+        if (a.kind === 'choice' && b.kind === 'choice') expect(b.answer, `${t.id}: ${qs[i - 1].sig} → ${qs[i].sig}`).not.toBe(a.answer);
+      }
+    }
+    for (let r = 0; r < 20; r++) {
+      const qs = buildExam(rng, []);
+      for (let i = 1; i < qs.length; i++) {
+        const a = qs[i - 1].parts[qs[i - 1].parts.length - 1], b = qs[i].parts[0];
+        if (a.kind === 'choice' && b.kind === 'choice') expect(b.answer).not.toBe(a.answer);
+      }
+    }
   });
 });
 
@@ -109,7 +146,7 @@ describe('several forms of the same number', () => {
         expect(Math.max(...counts.values())).toBeGreaterThanOrEqual(2);
         // no question is right after another question about the same number
         for (let i = 1; i < nums.length; i++) if (nums[i] > 0) expect(nums[i], qs.map((q) => q.sig).join(' ')).not.toBe(nums[i - 1]);
-        // both typing and choice questions
+        // both typed numbers / boxes and choice questions
         const kinds = new Set(qs.flatMap((q) => q.parts.map((p) => p.kind)));
         expect(kinds.has('choice')).toBe(true);
         expect([...kinds].some((k) => k !== 'choice')).toBe(true);
@@ -118,11 +155,12 @@ describe('several forms of the same number', () => {
     });
   }
 
-  it('digitValue round has typed place name, typed value (same digit, later) and a 4-option choice', () => {
+  it('digitValue round: place (choice), value of the same digit later (choice), a number answer and a 4-option digit choice', () => {
     const qs = buildTopicRound(new Rng(9), 'digitValue', []);
-    expect(qs[0].parts[0].kind).toBe('text');
-    expect(qs[0].sig).toContain('placeText');
-    expect(qs[4].sig).toContain('valueText');
+    expect(qs[0].parts[0].kind).toBe('choice');
+    expect(qs[0].sig).toContain('dv-place');
+    expect(qs[4].sig).toContain('dv-value');
+    expect(qs[3].parts[0].kind).toBe('number');
     expect(qs[0].sig.split('-').slice(2).join('-')).toBe(qs[4].sig.split('-').slice(2).join('-'));
     expect(qs[2].parts[0].choices!.length).toBe(4);
   });

@@ -31,7 +31,7 @@ export interface Part {
   /**
    * choice  – pick one button
    * number  – numeric keyboard
-   * text    – regular (Hebrew) keyboard, e.g. "עשרות"; accepts several spellings
+   * text    – typed words (no longer generated: word answers are choices now; kept for old saved rounds)
    * fields  – several numeric boxes in a column (decomposition like in the notebook)
    */
   kind: 'choice' | 'number' | 'text' | 'fields';
@@ -55,6 +55,8 @@ export interface Part {
   zeroHint?: string;
   /** HTML shown once the part is solved (or after the 2nd mistake) */
   after?: string;
+  /** choice: options keep a logical order (place names, angle types …), so they are not reshuffled */
+  fixedOrder?: boolean;
 }
 
 export interface Question {

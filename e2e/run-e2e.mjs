@@ -90,26 +90,38 @@ try {
   check('13 teacher topics listed', topicIds.length === 13, topicIds.join(','));
   for (const t of topicIds) {
     await page.click(`[data-act=open-topic][data-topic=${t}]`);
-    const ok = (await page.locator('.lesson-title').innerText()).includes('איך עושים את זה') &&
+    const exOk = (await page.locator('.lesson-title').innerText()).includes('איך עושים את זה') &&
       (await page.locator('.lesson-top [data-act=start-topic]').innerText()).includes('ישר לתרגול') &&
-      (await page.locator('.example').count()) >= 1 && (await page.locator('.your-turn').count()) >= 1;
-    check(`lesson card with example + "עכשיו תורך": ${t}`, ok);
-    await noHScroll('lesson ' + t);
+      (await page.locator('.example').count()) === 1 && (await page.locator('.your-turn').count()) === 0;
+    const sentences = (await text('.skill-explain')).split(/[.!?](?:\s|$)/).filter((x) => x.trim().length > 3).length;
+    await noHScroll('lesson example ' + t);
     await shot('L-' + t);
+    await page.click('.ex [data-act=lesson-step]');
+    const tryOk = (await page.locator('.your-turn').count()) === 1 && (await page.locator('.example').count()) === 0 &&
+      (await page.locator('.lesson-top [data-act=start-topic]').count()) === 1;
+    check(`lesson: example screen, then a separate "עכשיו תורך" screen: ${t}`, exOk && tryOk && sentences <= 3, `explain sentences: ${sentences}`);
+    await noHScroll('lesson try ' + t);
     await page.click('[data-act=topics]');
   }
 
-  /* ---------------------------------------------------------------- lesson try-it: hint then solve */
+  /* ---------------------------------------------------------------- lesson try-it: choice in words, hint then solve */
   await page.click('[data-act=open-topic][data-topic=digitValue]');
-  await page.fill('[data-input="L:digitValue:1-0"]', '700');
-  await page.click('form[data-key="L:digitValue:1"] button[type=submit]');
-  const lh = await text('[data-runner="L:digitValue:1"] .hint');
-  check('lesson focused hint after mistake', lh.includes('התחילי מימין'), lh);
-  await page.fill('[data-input="L:digitValue:1-0"]', '70');
-  await page.click('form[data-key="L:digitValue:1"] button[type=submit]');
-  check('lesson accepts correct answer (70)', (await page.locator('[data-runner="L:digitValue:1"] .num-result.correct').count()) === 1);
-  await page.click('[data-act=retry-lesson][data-key="L:digitValue:1"]');
-  check('"לנסות שוב" resets the lesson question', (await page.locator('[data-input="L:digitValue:1-0"]').count()) === 1);
+  await page.click('[data-act=lesson-step][data-step="3"]'); // "תורך 2": value of 7 in 473
+  {
+    const opts = await page.locator('[data-runner="L:digitValue:1"] [data-act=choose]').allInnerTexts();
+    check('value choices are 7, 70, 700 (only values that make sense)', opts.map((o) => o.trim()).join(',') === '7,70,700', opts.join(','));
+    await page.click('[data-runner="L:digitValue:1"] [data-act=choose] >> nth=0');
+    const lh = await text('[data-runner="L:digitValue:1"] .hint');
+    check('focused hint after choosing the digit itself', lh.includes('הספרה עצמה'), lh);
+    check('the wrong button says "לא נכון" (not only colour)', (await text('[data-runner="L:digitValue:1"] .choice.wrong')).includes('לא נכון'));
+    await page.click('[data-runner="L:digitValue:1"] [data-act=choose] >> nth=1');
+    check('lesson accepts the right value (70) with "✓ נכון"', (await text('[data-runner="L:digitValue:1"] .choice.right')).includes('נכון'));
+    check('a friend cheers (puppy wags / kitten raises a paw) after a correct answer', (await page.locator('[data-runner="L:digitValue:1"] .good .friend.mood-cheer').count()) === 1);
+    await page.click('[data-act=retry-lesson][data-key="L:digitValue:1"]');
+    check('"לנסות שוב" resets the lesson question', (await page.locator('[data-runner="L:digitValue:1"] .choice.right').count()) === 0);
+    await page.click('[data-act=lesson-step][data-step="2"]');
+    check('can go back to the worked example', (await page.locator('.example').count()) === 1);
+  }
 
   /* ---------------------------------------------------------------- topic round: number line */
   await page.click('[data-act=topics]');
@@ -294,81 +306,98 @@ try {
   await triRow.locator('[data-act=results-practice]').click();
   check('"תרגול נוסף" starts topic practice', (await text('.top-title')).includes('משולשים') && (await text('.progress-text')) === 'שאלה 1 מתוך 6');
 
-  /* ---------------------------------------------------------------- Hebrew answers, 4 boxes, cargo bays */
+  /* ---------------------------------------------------------------- word answers as buttons, 4 boxes with 0, cargo bays */
   {
     await page.click('[data-act=home]');
     await page.click('[data-act=topics]');
     await page.click('[data-act=open-topic][data-topic=digitValue]');
-    // worked example: tap the bay of 3 tens → three packs of 10 = 30
+    await page.click('[data-act=lesson-step][data-step="2"]'); // example 2: value of 3 in 7639
     await page.click('[data-cargo-id="dv-ex"] [data-act=bay][data-place="1"]');
     const packsN = await page.locator('[data-cargo-id="dv-ex"] .pk-10').count();
     const cap = await text('[data-cargo-id="dv-ex"] .packs-caption');
-    check('tapping the 3-tens bay shows 3 packs of 10 = 30', packsN === 3 && cap.includes('30'), `${packsN} packs, "${cap}"`);
+    check('tapping the 3-tens bay opens 3 packs of 10 → 30', packsN === 3 && cap.includes('30'), `${packsN} packs, "${cap}"`);
+    const capLtr = await page.evaluate(() => {
+      const el = document.querySelector('[data-cargo-id="dv-ex"] .packs-caption .m:last-of-type'); const tn = el.firstChild; const r = document.createRange();
+      r.setStart(tn, 0); r.setEnd(tn, 1); const a = r.getBoundingClientRect().x; r.setStart(tn, tn.length - 1); r.setEnd(tn, tn.length); return { ok: a < r.getBoundingClientRect().x, t: tn.textContent };
+    });
+    check('"3 × 10 = 30" reads left → right', capLtr.ok, capLtr.t);
     const bayDigits = await page.evaluate(() => [...document.querySelectorAll('[data-cargo-id="dv-ex"] .bay')].map((b) => ({ x: b.getBoundingClientRect().x, d: b.querySelector('.bay-digit').textContent, n: b.querySelector('.bay-name').textContent })));
     check('cargo bays read 7 6 3 9 left → right (אלפים … יחידות)', bayDigits.sort((a, b) => a.x - b.x).map((b) => b.d).join('') === '7639' && bayDigits[0].n === 'אלפים' && bayDigits[3].n === 'יחידות');
-    // "עכשיו תורך" 1: typed place name with the regular (Hebrew) keyboard
-    const placeInput = page.locator('[data-input="L:digitValue:0-0"]');
-    const attrs = await placeInput.evaluate((el) => ({ im: el.getAttribute('inputmode'), lang: el.getAttribute('lang'), pattern: el.getAttribute('pattern'), dir: el.getAttribute('dir') }));
-    check('place-name box opens the regular keyboard (inputmode=text, lang=he, no digit pattern)', attrs.im === 'text' && attrs.lang === 'he' && attrs.pattern === null && attrs.dir === 'rtl', JSON.stringify(attrs));
-    check('instruction under the box: "כתבי את שם המקום"', (await text('[data-runner="L:digitValue:0"] .field-hint')).includes('כתבי את שם המקום'));
-    await placeInput.pressSequentially('מֵאוֹת  ');
-    await page.click('form[data-key="L:digitValue:0"] button[type=submit]');
-    check('typed "מאות" (with niqqud + spaces) accepted', (await page.locator('[data-runner="L:digitValue:0"] .num-result.correct').count()) === 1);
-    check('Robi waves after a correct answer', (await page.locator('[data-runner="L:digitValue:0"] .good .robot-wave').count()) === 1);
-    check('opened bay stays open after the answer re-renders the screen', (await page.locator('[data-cargo-id="dv-ex"] .pk-10').count()) === 3);
-    // "עכשיו תורך" 2: value — writing the place gives the focused hint, words are accepted
-    await page.fill('[data-input="L:digitValue:1-0"]', 'עשרות');
-    await page.click('form[data-key="L:digitValue:1"] button[type=submit]');
-    const h2 = await text('[data-runner="L:digitValue:1"] .hint');
-    check('"עשרות" in the value question → "מצאת את המקום. כמה הן 7 עשרות?"', h2.includes('מצאת את המקום. כמה הן 7 עשרות?'), h2);
-    check('hint picture (cargo bay with packs) appears with the hint', (await page.locator('[data-runner="L:digitValue:1"] .hint-figure .pk-10').count()) === 7);
-    await page.fill('[data-input="L:digitValue:1-0"]', 'שבעים');
-    await page.click('form[data-key="L:digitValue:1"] button[type=submit]');
-    check('"שבעים" accepted as the value', (await page.locator('[data-runner="L:digitValue:1"] .num-result.correct').count()) === 1);
-    await shot('14-digit-value-card');
+    await shot('14-worked-example-bays');
 
-    // place-value card: 4 boxes with a 0 (7052)
+    // "עכשיו תורך" 1: place of 5 in 2,514 – four place-name buttons, no typing
+    await page.click('[data-act=lesson-step][data-step="1"]');
+    const runner = '[data-runner="L:digitValue:0"]';
+    check('no text box for a word answer', (await page.locator(`${runner} input`).count()) === 0);
+    const names = (await page.locator(`${runner} [data-act=choose]`).allInnerTexts()).map((x) => x.trim());
+    check('place buttons: אלפים, מאות, עשרות, יחידות', names.join(',') === 'אלפים,מאות,עשרות,יחידות', names.join(','));
+    await page.click(`${runner} [data-act=choose]:has-text("עשרות")`);
+    check('wrong word choice → hint and try again', (await page.locator(`${runner} .hint`).count()) === 1 && (await text(`${runner} .choice.wrong`)).includes('לא נכון'));
+    check('answer picture appears only with the hint', (await page.locator(`${runner} .hint-figure .cargo`).count()) === 1);
+    await page.click(`${runner} [data-act=choose]:has-text("מאות")`);
+    check('"מאות" accepted and marked "✓ נכון"', (await text(`${runner} .choice.right`)).includes('מאות'));
+    await shot('15-word-choice');
+
+    // place-value card: 4 boxes with a 0 (7052) – empty and 0 are different states
     await page.click('[data-act=topics]');
     await page.click('[data-act=open-topic][data-topic=placeValue]');
-    const rows = await page.evaluate(() => [...document.querySelectorAll('[data-runner="L:placeValue:0"] .frow')].map((r) => {
+    await page.click('.ex [data-act=lesson-step]');
+    const fr = '[data-runner="L:placeValue:0"]';
+    const rows = await page.evaluate((fr) => [...document.querySelectorAll(`${fr} .frow`)].map((r) => {
       const i = r.querySelector('input').getBoundingClientRect(), l = r.querySelector('.flabel').getBoundingClientRect();
       return { label: r.querySelector('.flabel').textContent, inputRight: i.x > l.x, im: r.querySelector('input').getAttribute('inputmode') };
-    }));
+    }), fr);
     check('4 rows אלפים/מאות/עשרות/יחידות', rows.map((r) => r.label).join(',') === 'אלפים,מאות,עשרות,יחידות');
     check('box comes before the word in Hebrew reading order (box on the right)', rows.every((r) => r.inputRight));
     check('decomposition boxes open the numeric keyboard', rows.every((r) => r.im === 'numeric'));
     await page.fill('[data-field="L:placeValue:0-0-0"]', '7');
-    await page.fill('[data-field="L:placeValue:0-0-2"]', '5');
+    await page.fill('[data-field="L:placeValue:0-0-2"]', '6'); // wrong (5)
     await page.fill('[data-field="L:placeValue:0-0-3"]', '2');
-    await page.click('[data-runner="L:placeValue:0"] form.fields-form button[type=submit]');
-    const badRows = await page.locator('[data-runner="L:placeValue:0"] .frow-bad').evaluateAll((els) => els.map((e) => e.querySelector('.flabel').textContent));
-    check('only the empty hundreds row is marked for fixing', badRows.join(',') === 'מאות', badRows.join(','));
+    await page.click(`${fr} form.fields-form button[type=submit]`);
+    const st = await page.evaluate((fr) => [...document.querySelectorAll(`${fr} .frow`)].map((r) => r.className + '|' + (r.querySelector('.fmark')?.textContent ?? '')), fr);
+    check('empty hundreds row: "השורה ריקה"; wrong tens row: "לתיקון"; others unmarked', st[1].includes('frow-empty') && st[1].includes('השורה ריקה') && st[2].includes('frow-bad') && st[2].includes('לתיקון') && !st[0].includes('frow-') && !st[3].includes('frow-'), st.join(' / '));
     check('what Noa typed is kept', (await page.inputValue('[data-field="L:placeValue:0-0-0"]')) === '7' && (await page.inputValue('[data-field="L:placeValue:0-0-3"]')) === '2');
-    const zh = await text('[data-runner="L:placeValue:0"] .hint');
+    const zh = await text(`${fr} .hint`);
     check('zero hint explains why 0 must be written', zh.includes('צריך לכתוב 0') && zh.includes('מאות'), zh);
-    check('hint picture of the boxes is not shown before solving', (await page.locator('[data-runner="L:placeValue:0"] .hint-figure').count()) === 0);
-    await shot('15-fields-zero-hint');
+    check('picture of the boxes not shown before solving', (await page.locator(`${fr} .hint-figure`).count()) === 0);
+    await shot('16-fields-zero-hint');
     await page.fill('[data-field="L:placeValue:0-0-1"]', '0');
-    await page.click('[data-runner="L:placeValue:0"] form.fields-form button[type=submit]');
-    check('all four boxes accepted with an explicit 0', (await page.locator('[data-runner="L:placeValue:0"] .good').count()) === 1);
-    const after = await text('[data-runner="L:placeValue:0"] .after');
-    check('after solving: decomposition by values 7,000 + 50 + 2', after.includes('7,000 + 50 + 2'), after);
-    const afterLtr = await page.evaluate(() => {
-      const el = document.querySelector('[data-runner="L:placeValue:0"] .after .m'); const tn = el.firstChild; const r = document.createRange();
+    await page.fill('[data-field="L:placeValue:0-0-2"]', '5');
+    await page.click(`${fr} form.fields-form button[type=submit]`);
+    check('all four boxes accepted with an explicit 0', (await page.locator(`${fr} .good`).count()) === 1);
+    const after = await text(`${fr} .after`);
+    check('after solving: 7,000 + 50 + 2', after.includes('7,000 + 50 + 2'), after);
+    const afterLtr = await page.evaluate((fr) => {
+      const el = document.querySelector(`${fr} .after .m`); const tn = el.firstChild; const r = document.createRange();
       r.setStart(tn, 0); r.setEnd(tn, 1); const a = r.getBoundingClientRect().x; r.setStart(tn, tn.length - 1); r.setEnd(tn, tn.length); return a < r.getBoundingClientRect().x;
-    });
+    }, fr);
     check('decomposition by values reads left → right', afterLtr);
-    await shot('16-fields-solved');
+    await shot('17-fields-solved');
 
-    // a real topic round: typed answers + choice, same numbers in several forms
+    // a real topic round: same numbers in several forms
     await page.click('.lesson-top [data-act=start-topic]');
     const pr = (await state()).practice;
     const sigNums = pr.questions.map((q) => (q.sig.match(/-(\d{4})(?:-|$)/) || [])[1]);
     check('placeValue round: same number met in several forms', new Set(sigNums.filter(Boolean)).size < sigNums.filter(Boolean).length, pr.questions.map((q) => q.sig).join(' '));
-    check('placeValue round mixes typing and choice', pr.questions.some((q) => q.parts[0].kind === 'choice') && pr.questions.some((q) => q.parts[0].kind !== 'choice'));
+    check('placeValue round mixes number boxes and choices', pr.questions.some((q) => q.parts[0].kind === 'choice') && pr.questions.some((q) => q.parts[0].kind !== 'choice'));
     check('hint picture hidden while answering', (await page.locator('.hint-figure').count()) === 0);
     for (let i = 0; i < 6; i++) { await answerPractice(i === 3 ? 'wrongThenRight' : 'right'); await noHScroll('placeValue round q' + (i + 1)); await page.click('[data-act=next-q]'); }
     check('placeValue round finished', (await text('.score-line')).includes('מתוך 6'));
+
+    // geometry question in practice
+    await page.click('[data-act=home]');
+    await page.click('[data-act=topics]');
+    await page.click('[data-act=open-topic][data-topic=triangles]');
+    await page.click('.lesson-top [data-act=start-topic]');
+    const tq = (await state()).practice.questions[0];
+    const lens = await page.locator('.q-figure .len').allInnerTexts();
+    check('triangle drawn with 3 labelled sides', lens.length === 3, lens.join(','));
+    const wrongId = tq.parts[0].choices.find((c) => c.id !== tq.parts[0].answer).id;
+    await page.click(`[data-act=choose][data-key=P][data-choice="${wrongId}"]`);
+    check('geometry: wrong type → hint + "לא נכון"', (await page.locator('.hint').count()) === 1 && (await text('.choice.wrong')).includes('לא נכון'));
+    await page.click(`[data-act=choose][data-key=P][data-choice="${tq.parts[0].answer}"]`);
+    check('geometry: right type → "✓ נכון" and a friend cheers (puppy wags / kitten raises a paw)', (await text('.choice.right')).includes('נכון') && (await page.locator('.good .friend.mood-cheer').count()) === 1);
+    await shot('18-geometry-practice');
   }
 
   /* ---------------------------------------------------------------- layout sweep: 2 rounds × 13 topics at 360px */
@@ -393,6 +422,60 @@ try {
     }
     check(`layout sweep: ${seen} questions fit 360px without horizontal scroll`, bad.length === 0, bad.join('; '));
   }
+  /* ---------------------------------------------------------------- 390px pass */
+  {
+    const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true, locale: 'he-IL' });
+    const p2 = await ctx2.newPage();
+    p2.on('pageerror', (e) => errors.push(String(e)));
+    const bad = [];
+    const fits = async (where) => {
+      const w = await p2.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+      if (w.sw > w.cw) bad.push(`${where} ${w.sw}/${w.cw}`);
+    };
+    await p2.goto(URL);
+    await fits('home');
+    await p2.screenshot({ path: path.join(shots, '390-home.png'), fullPage: true });
+    await p2.click('[data-act=topics]');
+    await fits('topics');
+    const ids = await p2.locator('[data-act=open-topic]').evaluateAll((els) => els.map((e) => e.dataset.topic));
+    let screens = 0;
+    for (const t of ids) {
+      await p2.click(`[data-act=open-topic][data-topic=${t}]`);
+      const n = await p2.locator('[data-act=lesson-step].step-dot').count();
+      for (let i = 0; i < n; i++) { await p2.click(`.step-dot[data-step="${i}"]`); await fits(`lesson ${t} step ${i}`); screens++; }
+      if (t === 'placeValue') await p2.screenshot({ path: path.join(shots, '390-lesson.png'), fullPage: true });
+      await p2.click('.lesson-top [data-act=start-topic]');
+      for (let i = 0; i < 6; i++) {
+        await fits(`${t} q${i + 1}`); screens++;
+        const st = await p2.evaluate((k) => JSON.parse(localStorage.getItem(k)), KEY);
+        const q = st.practice.questions[i];
+        for (let pi = 0; pi < q.parts.length; pi++) {
+          const part = q.parts[pi];
+          if (part.kind === 'choice') await p2.click(`[data-act=choose][data-key=P][data-part="${pi}"][data-choice="${part.answer}"]`);
+          else if (part.kind === 'fields') { for (let k = 0; k < part.fields.length; k++) await p2.fill(`[data-field="P-${pi}-${k}"]`, part.fields[k].answer); await p2.click(`form.fields-form[data-part="${pi}"] button`); }
+          else { await p2.fill(`[data-input="P-${pi}"]`, part.answer); await p2.click(`form[data-key="P"][data-part="${pi}"] button`); }
+        }
+        await fits(`${t} q${i + 1} solved`);
+        if (t === 'angles' && i === 0) await p2.screenshot({ path: path.join(shots, '390-practice.png'), fullPage: true });
+        await p2.click('[data-act=next-q]');
+      }
+      await fits(`${t} summary`);
+      await p2.click('[data-act=home]');
+      await p2.click('[data-act=topics]');
+    }
+    await p2.click('[data-act=home]');
+    await p2.click('[data-act=start-exam]');
+    const nEx = (await p2.evaluate((k) => JSON.parse(localStorage.getItem(k)), KEY)).exam.questions.length;
+    for (let i = 0; i < nEx; i++) { await fits(`exam q${i + 1}`); screens++; if (i < nEx - 1) await p2.click('[data-act=exam-next]'); }
+    await p2.click('.exam-buttons [data-act=exam-submit]');
+    await p2.click('[data-act=exam-submit-yes]');
+    await fits('exam results');
+    await p2.click('[data-act=review]');
+    await fits('exam review');
+    check(`390px: ${screens} screens (all lesson steps, 13 rounds, exam, results, review) without horizontal scroll`, bad.length === 0, bad.join('; '));
+    await ctx2.close();
+  }
+
   check('no JS errors in console', errors.length === 0, errors.join(' | '));
 } catch (e) {
   check('e2e run finished without exception', false, String(e && e.stack || e));
