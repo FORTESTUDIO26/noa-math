@@ -1,0 +1,11 @@
+{
+  "name": "המתמטיקה של נועה",
+  "short_name": "מתמטיקה",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f6f3ff",
+  "theme_color": "#5b3fd6",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
