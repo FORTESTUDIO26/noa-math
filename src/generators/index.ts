@@ -1,7 +1,8 @@
 import type { Level, Question, TopicId } from '../types';
 import type { Rng } from '../rng';
-import { placeValue, digitValue, prevNext, evenOdd, multDiv, missing, numberLineQ, sequences, multMeaning, wordProblems } from './numbers';
+import { prevNext, evenOdd, multDiv, missing, numberLineQ, sequences, multMeaning, wordProblems } from './numbers';
 import { angles, polygons, triangles } from './geometry';
+import { placeValue, digitValue } from './place';
 
 export const GENERATORS: Record<TopicId, (rng: Rng, level: Level) => Question> = {
   placeValue, digitValue, prevNext, evenOdd, multDiv, missing,

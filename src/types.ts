@@ -14,16 +14,47 @@ export interface Choice {
   isFigure?: boolean;
 }
 
+export interface Field {
+  /** label after the box, e.g. "אלפים" */
+  label: string;
+  /** expected digit(s) */
+  answer: string;
+}
+
+export interface TrapHint {
+  /** normalized wrong answers that trigger this hint */
+  match: string[];
+  hint: string;
+}
+
 export interface Part {
-  kind: 'choice' | 'number';
+  /**
+   * choice  – pick one button
+   * number  – numeric keyboard
+   * text    – regular (Hebrew) keyboard, e.g. "עשרות"; accepts several spellings
+   * fields  – several numeric boxes in a column (decomposition like in the notebook)
+   */
+  kind: 'choice' | 'number' | 'text' | 'fields';
   prompt?: string;
   choices?: Choice[];
-  /** choice id, or integer as string */
+  /** choice id / integer / display answer for text / "7|0|5|2" for fields */
   answer: string;
   /** short hint shown after the first mistake */
   hint: string;
   /** text shown after the input, e.g. "תפוחים" */
   suffix?: string;
+  /** text: all accepted answers (compared after normalization) */
+  accept?: string[];
+  /** short instruction under the input, e.g. "כתבי את שם המקום" */
+  fieldHint?: string;
+  /** focused hints for typical wrong answers */
+  traps?: TrapHint[];
+  /** fields kind */
+  fields?: Field[];
+  /** fields: hint when a box whose answer is 0 was left empty */
+  zeroHint?: string;
+  /** HTML shown once the part is solved (or after the 2nd mistake) */
+  after?: string;
 }
 
 export interface Question {
@@ -37,6 +68,8 @@ export interface Question {
   math?: string;
   /** HTML/SVG illustration */
   figure?: string;
+  /** illustration that gives the answer away – shown only with the hint or after checking */
+  hintFigure?: string;
   parts: Part[];
   /** full explained solution (HTML) */
   explanation: string;

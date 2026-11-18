@@ -50,10 +50,16 @@ async function answerPractice(mode = 'right') {
     const tries = mode === 'right' ? ['R'] : mode === 'wrongThenRight' ? ['W', 'R'] : ['W', 'W'];
     for (let k = 0; k < tries.length; k++) {
       const t = tries[k];
-      if (part.kind === 'number') {
-        const v = t === 'R' ? part.answer : String(Number(part.answer) + 1);
+      if (part.kind === 'number' || part.kind === 'text') {
+        const v = t === 'R' ? (part.kind === 'text' ? part.accept[0] : part.answer) : part.kind === 'text' ? 'משהו אחר' : String(Number(part.answer) + 1);
         await page.fill(`[data-input="P-${pi}"]`, v);
         await page.click(`form[data-key="P"][data-part="${pi}"] button[type=submit]`);
+      } else if (part.kind === 'fields') {
+        for (let i = 0; i < part.fields.length; i++) {
+          const a = part.fields[i].answer;
+          await page.fill(`[data-field="P-${pi}-${i}"]`, t === 'R' ? a : i === 0 ? String((Number(a) + 1) % 10) : a);
+        }
+        await page.click(`form.fields-form[data-key="P"][data-part="${pi}"] button[type=submit]`);
       } else {
         const id = t === 'R' ? part.answer : await page.locator(`[data-act=choose][data-key=P][data-part="${pi}"]:not([disabled])`).evaluateAll((els, ans) => els.map((e) => e.dataset.choice).find((c) => c !== ans), part.answer);
         await page.click(`[data-act=choose][data-key=P][data-part="${pi}"][data-choice="${id}"]`);
@@ -95,13 +101,15 @@ try {
 
   /* ---------------------------------------------------------------- lesson try-it: hint then solve */
   await page.click('[data-act=open-topic][data-topic=digitValue]');
-  await page.fill('[data-input="L:digitValue:0-0"]', '7');
-  await page.click('form[data-key="L:digitValue:0"] button[type=submit]');
-  const lh = await text('.your-turn .hint');
+  await page.fill('[data-input="L:digitValue:1-0"]', '700');
+  await page.click('form[data-key="L:digitValue:1"] button[type=submit]');
+  const lh = await text('[data-runner="L:digitValue:1"] .hint');
   check('lesson focused hint after mistake', lh.includes('התחילי מימין'), lh);
-  await page.fill('[data-input="L:digitValue:0-0"]', '70');
-  await page.click('form[data-key="L:digitValue:0"] button[type=submit]');
-  check('lesson accepts correct answer (70)', (await page.locator('.your-turn .num-result.correct').count()) === 1);
+  await page.fill('[data-input="L:digitValue:1-0"]', '70');
+  await page.click('form[data-key="L:digitValue:1"] button[type=submit]');
+  check('lesson accepts correct answer (70)', (await page.locator('[data-runner="L:digitValue:1"] .num-result.correct').count()) === 1);
+  await page.click('[data-act=retry-lesson][data-key="L:digitValue:1"]');
+  check('"לנסות שוב" resets the lesson question', (await page.locator('[data-input="L:digitValue:1-0"]').count()) === 1);
 
   /* ---------------------------------------------------------------- topic round: number line */
   await page.click('[data-act=topics]');
@@ -229,14 +237,20 @@ try {
     if (makeWrong) wrongIdx = i;
     for (let pi = 0; pi < q.parts.length; pi++) {
       const part = q.parts[pi];
-      if (part.kind === 'number') {
-        await page.fill(`[data-exam-input="${pi}"]`, makeWrong ? String(Number(part.answer) + 1) : part.answer);
+      if (part.kind === 'number' || part.kind === 'text') {
+        const right = part.kind === 'text' ? part.accept[0] : part.answer;
+        await page.fill(`[data-exam-input="${pi}"]`, makeWrong ? (part.kind === 'text' ? 'לא' : String(Number(part.answer) + 1)) : right);
+      } else if (part.kind === 'fields') {
+        for (let i = 0; i < part.fields.length; i++) {
+          const a = part.fields[i].answer;
+          await page.fill(`[data-exam-field="${pi}:${i}"]`, makeWrong && i === 0 ? String((Number(a) + 1) % 10) : a);
+        }
       } else {
         const id = makeWrong ? part.choices.find((c) => c.id !== part.answer).id : part.answer;
         await page.click(`[data-act=exam-choose][data-part="${pi}"][data-choice="${id}"]`);
       }
     }
-    check(`no solution/hint visible during exam (q${i + 1})`, (await page.locator('.explain, .hint, .num-result').count()) === 0);
+    check(`no solution/hint visible during exam (q${i + 1})`, (await page.locator('.explain, .hint, .num-result, .hint-figure, .after').count()) === 0);
     await noHScroll('exam q' + (i + 1));
     if (i < exam.questions.length - 1) await page.click('[data-act=exam-next]');
   }
@@ -244,18 +258,16 @@ try {
   await page.click('[data-act=exam-go][data-i="0"]');
   check('can return to question 1', (await text('.progress-text')) === `שאלה 1 מתוך ${exam.questions.length}`);
   const q0 = exam.questions[0];
-  if (q0.parts[0].kind === 'number') {
-    check('previous answer kept', (await page.inputValue('[data-exam-input="0"]')) === q0.parts[0].answer);
-    await page.fill('[data-exam-input="0"]', '1');
+  check('exam question 1 is the 4-box decomposition', q0.parts[0].kind === 'fields');
+  {
+    const f = q0.parts[0].fields;
+    check('previous answers kept in all four boxes', (await Promise.all(f.map((_, i) => page.inputValue(`[data-exam-field="0:${i}"]`)))).join('|') === f.map((x) => x.answer).join('|'));
+    await page.fill('[data-exam-field="0:2"]', '');
     await page.reload();
-    check('exam answer saved after refresh', (await page.inputValue('[data-exam-input="0"]')) === '1');
-    await page.fill('[data-exam-input="0"]', q0.parts[0].answer);
-  } else {
-    const other = q0.parts[0].choices.find((c) => c.id !== q0.parts[0].answer).id;
-    await page.click(`[data-act=exam-choose][data-part="0"][data-choice="${other}"]`);
-    await page.reload();
-    check('exam answer saved after refresh', (await state()).exam.answers[0][0] === other);
-    await page.click(`[data-act=exam-choose][data-part="0"][data-choice="${q0.parts[0].answer}"]`);
+    check('exam boxes saved after refresh (one emptied)', (await page.inputValue('[data-exam-field="0:2"]')) === '' && (await page.inputValue('[data-exam-field="0:0"]')) === f[0].answer);
+    check('question chip shows "not answered" while a box is empty', !(await page.locator('.qchip[data-i="0"]').getAttribute('class')).includes('answered'));
+    await page.fill('[data-exam-field="0:2"]', f[2].answer);
+    check('chip is "answered" again', (await page.locator('.qchip[data-i="0"]').getAttribute('class')).includes('answered'));
   }
   await page.click('.submit-row [data-act=exam-submit], .exam-buttons [data-act=exam-submit]');
   check('submit asks for confirmation', (await page.locator('.confirm').count()) === 1);
@@ -276,10 +288,88 @@ try {
   await page.click('[data-act=review]');
   check('solutions shown after submit', (await page.locator('.rev .explain').count()) === exam.questions.length);
   check('review marks the wrong question', (await page.locator('.rev-bad').count()) === 1);
+  await noHScroll('exam review');
   await shot('13-exam-review');
   await page.click('.col [data-act=back-to-results]');
   await triRow.locator('[data-act=results-practice]').click();
   check('"תרגול נוסף" starts topic practice', (await text('.top-title')).includes('משולשים') && (await text('.progress-text')) === 'שאלה 1 מתוך 6');
+
+  /* ---------------------------------------------------------------- Hebrew answers, 4 boxes, cargo bays */
+  {
+    await page.click('[data-act=home]');
+    await page.click('[data-act=topics]');
+    await page.click('[data-act=open-topic][data-topic=digitValue]');
+    // worked example: tap the bay of 3 tens → three packs of 10 = 30
+    await page.click('[data-cargo-id="dv-ex"] [data-act=bay][data-place="1"]');
+    const packsN = await page.locator('[data-cargo-id="dv-ex"] .pk-10').count();
+    const cap = await text('[data-cargo-id="dv-ex"] .packs-caption');
+    check('tapping the 3-tens bay shows 3 packs of 10 = 30', packsN === 3 && cap.includes('30'), `${packsN} packs, "${cap}"`);
+    const bayDigits = await page.evaluate(() => [...document.querySelectorAll('[data-cargo-id="dv-ex"] .bay')].map((b) => ({ x: b.getBoundingClientRect().x, d: b.querySelector('.bay-digit').textContent, n: b.querySelector('.bay-name').textContent })));
+    check('cargo bays read 7 6 3 9 left → right (אלפים … יחידות)', bayDigits.sort((a, b) => a.x - b.x).map((b) => b.d).join('') === '7639' && bayDigits[0].n === 'אלפים' && bayDigits[3].n === 'יחידות');
+    // "עכשיו תורך" 1: typed place name with the regular (Hebrew) keyboard
+    const placeInput = page.locator('[data-input="L:digitValue:0-0"]');
+    const attrs = await placeInput.evaluate((el) => ({ im: el.getAttribute('inputmode'), lang: el.getAttribute('lang'), pattern: el.getAttribute('pattern'), dir: el.getAttribute('dir') }));
+    check('place-name box opens the regular keyboard (inputmode=text, lang=he, no digit pattern)', attrs.im === 'text' && attrs.lang === 'he' && attrs.pattern === null && attrs.dir === 'rtl', JSON.stringify(attrs));
+    check('instruction under the box: "כתבי את שם המקום"', (await text('[data-runner="L:digitValue:0"] .field-hint')).includes('כתבי את שם המקום'));
+    await placeInput.pressSequentially('מֵאוֹת  ');
+    await page.click('form[data-key="L:digitValue:0"] button[type=submit]');
+    check('typed "מאות" (with niqqud + spaces) accepted', (await page.locator('[data-runner="L:digitValue:0"] .num-result.correct').count()) === 1);
+    check('Robi waves after a correct answer', (await page.locator('[data-runner="L:digitValue:0"] .good .robot-wave').count()) === 1);
+    check('opened bay stays open after the answer re-renders the screen', (await page.locator('[data-cargo-id="dv-ex"] .pk-10').count()) === 3);
+    // "עכשיו תורך" 2: value — writing the place gives the focused hint, words are accepted
+    await page.fill('[data-input="L:digitValue:1-0"]', 'עשרות');
+    await page.click('form[data-key="L:digitValue:1"] button[type=submit]');
+    const h2 = await text('[data-runner="L:digitValue:1"] .hint');
+    check('"עשרות" in the value question → "מצאת את המקום. כמה הן 7 עשרות?"', h2.includes('מצאת את המקום. כמה הן 7 עשרות?'), h2);
+    check('hint picture (cargo bay with packs) appears with the hint', (await page.locator('[data-runner="L:digitValue:1"] .hint-figure .pk-10').count()) === 7);
+    await page.fill('[data-input="L:digitValue:1-0"]', 'שבעים');
+    await page.click('form[data-key="L:digitValue:1"] button[type=submit]');
+    check('"שבעים" accepted as the value', (await page.locator('[data-runner="L:digitValue:1"] .num-result.correct').count()) === 1);
+    await shot('14-digit-value-card');
+
+    // place-value card: 4 boxes with a 0 (7052)
+    await page.click('[data-act=topics]');
+    await page.click('[data-act=open-topic][data-topic=placeValue]');
+    const rows = await page.evaluate(() => [...document.querySelectorAll('[data-runner="L:placeValue:0"] .frow')].map((r) => {
+      const i = r.querySelector('input').getBoundingClientRect(), l = r.querySelector('.flabel').getBoundingClientRect();
+      return { label: r.querySelector('.flabel').textContent, inputRight: i.x > l.x, im: r.querySelector('input').getAttribute('inputmode') };
+    }));
+    check('4 rows אלפים/מאות/עשרות/יחידות', rows.map((r) => r.label).join(',') === 'אלפים,מאות,עשרות,יחידות');
+    check('box comes before the word in Hebrew reading order (box on the right)', rows.every((r) => r.inputRight));
+    check('decomposition boxes open the numeric keyboard', rows.every((r) => r.im === 'numeric'));
+    await page.fill('[data-field="L:placeValue:0-0-0"]', '7');
+    await page.fill('[data-field="L:placeValue:0-0-2"]', '5');
+    await page.fill('[data-field="L:placeValue:0-0-3"]', '2');
+    await page.click('[data-runner="L:placeValue:0"] form.fields-form button[type=submit]');
+    const badRows = await page.locator('[data-runner="L:placeValue:0"] .frow-bad').evaluateAll((els) => els.map((e) => e.querySelector('.flabel').textContent));
+    check('only the empty hundreds row is marked for fixing', badRows.join(',') === 'מאות', badRows.join(','));
+    check('what Noa typed is kept', (await page.inputValue('[data-field="L:placeValue:0-0-0"]')) === '7' && (await page.inputValue('[data-field="L:placeValue:0-0-3"]')) === '2');
+    const zh = await text('[data-runner="L:placeValue:0"] .hint');
+    check('zero hint explains why 0 must be written', zh.includes('צריך לכתוב 0') && zh.includes('מאות'), zh);
+    check('hint picture of the boxes is not shown before solving', (await page.locator('[data-runner="L:placeValue:0"] .hint-figure').count()) === 0);
+    await shot('15-fields-zero-hint');
+    await page.fill('[data-field="L:placeValue:0-0-1"]', '0');
+    await page.click('[data-runner="L:placeValue:0"] form.fields-form button[type=submit]');
+    check('all four boxes accepted with an explicit 0', (await page.locator('[data-runner="L:placeValue:0"] .good').count()) === 1);
+    const after = await text('[data-runner="L:placeValue:0"] .after');
+    check('after solving: decomposition by values 7,000 + 50 + 2', after.includes('7,000 + 50 + 2'), after);
+    const afterLtr = await page.evaluate(() => {
+      const el = document.querySelector('[data-runner="L:placeValue:0"] .after .m'); const tn = el.firstChild; const r = document.createRange();
+      r.setStart(tn, 0); r.setEnd(tn, 1); const a = r.getBoundingClientRect().x; r.setStart(tn, tn.length - 1); r.setEnd(tn, tn.length); return a < r.getBoundingClientRect().x;
+    });
+    check('decomposition by values reads left → right', afterLtr);
+    await shot('16-fields-solved');
+
+    // a real topic round: typed answers + choice, same numbers in several forms
+    await page.click('.lesson-top [data-act=start-topic]');
+    const pr = (await state()).practice;
+    const sigNums = pr.questions.map((q) => (q.sig.match(/-(\d{4})(?:-|$)/) || [])[1]);
+    check('placeValue round: same number met in several forms', new Set(sigNums.filter(Boolean)).size < sigNums.filter(Boolean).length, pr.questions.map((q) => q.sig).join(' '));
+    check('placeValue round mixes typing and choice', pr.questions.some((q) => q.parts[0].kind === 'choice') && pr.questions.some((q) => q.parts[0].kind !== 'choice'));
+    check('hint picture hidden while answering', (await page.locator('.hint-figure').count()) === 0);
+    for (let i = 0; i < 6; i++) { await answerPractice(i === 3 ? 'wrongThenRight' : 'right'); await noHScroll('placeValue round q' + (i + 1)); await page.click('[data-act=next-q]'); }
+    check('placeValue round finished', (await text('.score-line')).includes('מתוך 6'));
+  }
 
   /* ---------------------------------------------------------------- layout sweep: 2 rounds × 13 topics at 360px */
   {

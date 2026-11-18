@@ -4,7 +4,10 @@
  */
 import type { Question, TopicId, Part } from './types';
 import { m, X, D, MINUS, BLANK, mathChoice, textChoice } from './format';
-import { numberLine, sequenceFigure, groupsFigure, angleFigure, polygonFigure, triangleFigure, placeTable } from './figures';
+import { numberLine, sequenceFigure, groupsFigure, angleFigure, polygonFigure, triangleFigure } from './figures';
+import { cargoBays } from './space';
+import { qFields, qPlaceText, qValueText } from './generators/place';
+import { fmt, placeName, digitsOf } from './format';
 import { CONFIG } from './config';
 import { ANGLE_NAMES, angleTypes, TRI_NAMES, triangleOptions, polygonSides } from './generators/geometry';
 
@@ -22,6 +25,18 @@ export interface Lesson { topic: TopicId; skills: Skill[] }
 const num = (answer: number, hint: string, extra: Partial<Part> = {}): Part => ({ kind: 'number', answer: String(answer), hint, ...extra });
 const tq = (topic: TopicId, sig: string, prompt: string, parts: Part[], explanation: string, extra: Partial<Question> = {}): Question =>
   ({ topic, level: 1, sig: 'lesson-' + sig, prompt, parts, explanation, ...extra });
+
+/** generated question reused as a lesson "עכשיו תורך" (own signature, optional overrides for part 0) */
+function lessonQ(q: Question, sig: string, partOver: Partial<Part> & { hintFigure?: string } = {}): Question {
+  const { hintFigure, ...po } = partOver;
+  return { ...q, sig: 'lesson-' + sig, hintFigure: hintFigure ?? q.hintFigure, parts: q.parts.map((p, i) => (i === 0 ? { ...p, ...po } : p)) };
+}
+
+/** notebook rows, filled: [7] אלפים / [6] מאות / … */
+function notebookRows(n: number): string {
+  const ds = digitsOf(n);
+  return `<div class="nb-rows" aria-label="פירוק במחברת">${[3, 2, 1, 0].map((p) => `<div class="frow"><span class="nb-box">${ds[p] ?? 0}</span><span class="flabel">${placeName(p)}</span><span class="nb-val">← ${m(fmt((ds[p] ?? 0) * 10 ** p))}</span></div>`).join('')}</div>`;
+}
 
 /** fixed (not shuffled) choice order for lesson questions */
 function fixedChoices(correct: { html: string; text: string; isFigure?: boolean }, others: { html: string; text: string; isFigure?: boolean }[], correctPos: number) {
@@ -51,32 +66,31 @@ export function buildLessons(): Record<TopicId, Lesson> {
       topic: 'placeValue',
       skills: [
         {
-          title: 'פירוק מספר',
-          explain: 'כל ספרה שווה לפי המקום שלה: אלפים, מאות, עשרות או יחידות. כדי לפרק, כותבים כמה שווה כל ספרה ומחברים. ספרה 0 לא כותבים בפירוק.',
+          title: 'פירוק לאלפים, מאות, עשרות ויחידות',
+          explain: 'כל ספרה נכנסת לתא המטען שלה בחללית: אלפים, מאות, עשרות או יחידות. בפירוק כותבים בכל שורה את הספרה של אותו תא, ואם התא ריק – כותבים 0.',
           example: {
-            task: `לפרק את המספר ${m('3,507')}`,
-            figure: placeTable(3507),
+            task: 'פרקי את המספר 7639.',
+            figure: cargoBays(7639, { interactive: true, highlight: 1, id: 'pv-ex', prompt: 'לחצי על התא של 3 עשרות (מסומן בחץ) ותראי מה יש בו' }) + notebookRows(7639),
             steps: [
-              `3 במקום האלפים ← ${m('3,000')}. 5 במקום המאות ← ${m('500')}.`,
-              `0 במקום העשרות ← אין עשרות, לא כותבים. 7 במקום היחידות ← ${m('7')}.`,
+              'מעבירים כל ספרה לשורה שלה: 7 אלפים, 6 מאות, 3 עשרות ו־9 יחידות.',
+              `כמה שווה כל תא? בתא העשרות יש 3 חבילות של 10: ${m('10 + 10 + 10 = 30')}.`,
+              `באותו אופן: 7 אלפים הם ${m('7,000')}, ו־6 מאות הן ${m('600')}.`,
             ],
-            answer: m('3,507 = 3,000 + 500 + 7'),
+            answer: `לפי ערכים: ${m('7,639 = 7,000 + 600 + 30 + 9')}`,
           },
-          tryIt: tq('placeValue', 'pv1', 'השלימי את הפירוק.', [num(60, 'באיזה מקום נמצאת הספרה 6 במספר 4,062? כמה היא שווה?')],
-            `במספר ${m('4,062')} הספרה 6 נמצאת במקום העשרות. 6 עשרות הן ${m('60')}. לכן ${m('4,062 = 4,000 + 60 + 2')}.`,
-            { math: `4,062 = 4,000 + ${BLANK} + 2` }),
+          tryIt: lessonQ(qFields('placeValue', 1, 7052), 'pv1'),
         },
         {
           title: 'הרכבת מספר',
-          explain: 'כותבים ספרה אחת לכל מקום, לפי הסדר: אלפים, מאות, עשרות, יחידות. אם אין כלום באחד המקומות – כותבים שם 0.',
+          explain: 'כותבים ספרה אחת לכל תא, לפי הסדר: אלפים, מאות, עשרות, יחידות. אם תא ריק – כותבים בו 0.',
           example: {
             task: 'לכתוב את המספר: 2 אלפים, 4 עשרות ו־9 יחידות',
-            figure: placeTable(2049, { highlight: 2 }),
-            steps: ['אלפים: 2. מאות: אין ← כותבים 0 (מסומן בחץ).', 'עשרות: 4. יחידות: 9.'],
+            figure: cargoBays(2049, { highlight: 2 }),
+            steps: ['אלפים: 2. מאות: אין – התא ריק, כותבים 0 (מסומן בחץ).', 'עשרות: 4. יחידות: 9.'],
             answer: m('2,049'),
           },
           tryIt: tq('placeValue', 'pv2', 'כתבי את המספר: <b>5 אלפים, 3 מאות ו־8 יחידות</b>.', [num(5308, 'אין עשרות במספר. מה כותבים במקום העשרות?')],
-            `אלפים 5, מאות 3, עשרות – אין, לכן 0, יחידות 8. המספר: ${m('5,308')}.`),
+            `אלפים 5, מאות 3, עשרות – אין, לכן 0, יחידות 8. המספר: ${m('5,308')}.`, { hintFigure: cargoBays(5308, { highlight: 1 }) }),
         },
       ],
     },
@@ -86,17 +100,29 @@ export function buildLessons(): Record<TopicId, Lesson> {
       topic: 'digitValue',
       skills: [
         {
-          title: 'מה הערך של הספרה?',
-          explain: 'קודם מוצאים באיזה מקום הספרה נמצאת. מתחילים מימין: יחידות, עשרות, מאות, אלפים. הערך הוא הספרה כפול המקום שלה.',
+          title: 'באיזה מקום נמצאת הספרה?',
+          explain: 'המקום הוא השם של תא המטען: יחידות, עשרות, מאות או אלפים. מתחילים מימין – הספרה הימנית היא היחידות. את התשובה כותבים במילה.',
           example: {
-            task: 'מה הערך של הספרה 5 במספר 352?',
-            figure: placeTable(352, { highlight: 1 }),
-            steps: ['במספר 352, הספרה 5 נמצאת במקום העשרות (מסומנת בחץ).', `5 עשרות הן ${m('50')}.`],
-            answer: 'הערך של הספרה 5 הוא 50.',
+            task: 'באיזה מקום נמצאת הספרה 3 במספר 7639?',
+            figure: cargoBays(7639, { highlight: 1 }),
+            steps: ['מתחילים מימין: 9 ביחידות, 3 בעשרות, 6 במאות, 7 באלפים.', 'הספרה 3 נמצאת בתא העשרות (מסומן בחץ).'],
+            answer: 'התשובה: <b>עשרות</b> – זה המקום.',
           },
-          tryIt: tq('digitValue', 'dv1', 'מה הערך של הספרה <b>7</b> במספר <b>473</b>?',
-            [num(70, 'התחילי מימין. הספרה הראשונה היא ספרת היחידות. באיזה מקום נמצאת הספרה 7?')],
-            `במספר 473: 3 יחידות, 7 עשרות, 4 מאות. הספרה 7 נמצאת במקום העשרות, ו־7 עשרות הן ${m('70')}.`),
+          tryIt: lessonQ(qPlaceText('digitValue', 1, 2514, 2), 'dv1'),
+        },
+        {
+          title: 'מה הערך של הספרה?',
+          explain: 'הערך הוא כמה הספרה שווה במקום שלה. קודם מוצאים את המקום, ואחר כך סופרים את החבילות שבתא.',
+          example: {
+            task: 'מה הערך של הספרה 3 במספר 7639?',
+            figure: cargoBays(7639, { interactive: true, highlight: 1, id: 'dv-ex', prompt: 'לחצי על התא של 3 עשרות' }),
+            steps: ['הספרה 3 נמצאת במקום העשרות.', `בתא העשרות יש 3 חבילות של 10: ${m('3 × 10 = 30')}.`],
+            answer: 'המקום הוא <b>עשרות</b>, והערך הוא <b>30</b>.',
+          },
+          tryIt: lessonQ(qValueText('digitValue', 1, 473, 1), 'dv2', {
+            hint: 'התחילי מימין. הספרה הראשונה היא ספרת היחידות. באיזה מקום נמצאת הספרה 7?',
+            hintFigure: cargoBays(473, { highlight: 1, open: 1 }),
+          }),
         },
       ],
     },
@@ -139,7 +165,7 @@ export function buildLessons(): Record<TopicId, Lesson> {
           explain: 'מסתכלים רק על ספרת היחידות – הספרה הימנית. אם היא 0, 2, 4, 6 או 8 – המספר זוגי. אם היא 1, 3, 5, 7 או 9 – אי־זוגי.',
           example: {
             task: 'האם 3,476 זוגי או אי־זוגי?',
-            figure: placeTable(3476, { highlight: 0 }),
+            figure: cargoBays(3476, { highlight: 0 }),
             steps: ['ספרת היחידות היא 6 (מסומנת בחץ).', '6 הוא מספר זוגי.'],
             answer: 'לכן 3,476 הוא מספר זוגי.',
           },
@@ -259,15 +285,15 @@ export function buildLessons(): Record<TopicId, Lesson> {
           explain: 'בציור של כפל יש קבוצות שוות. סופרים כמה קבוצות יש, וכמה יש בכל קבוצה. התרגיל: מספר הקבוצות × כמה בכל קבוצה.',
           example: {
             task: 'איזה תרגיל מתאים לציור?',
-            figure: groupsFigure([4, 4, 4], { numbered: true, perLabel: true, item: 'star' }),
-            steps: ['סופרים מסגרות: 3 קבוצות (המספר מעל כל מסגרת).', 'בכל קבוצה 4 כוכבים (המספר מתחת לכל מסגרת).'],
+            figure: groupsFigure([4, 4, 4], { numbered: true, perLabel: true, item: 'robot' }),
+            steps: ['סופרים חלליות: 3 קבוצות (המספר מעל כל מסגרת).', 'בכל קבוצה 4 רובוטים (המספר מתחת לכל מסגרת).'],
             answer: `התרגיל: ${m(`3 ${X} 4 = 12`)}.`,
           },
           tryIt: (() => {
             const { choices, answer } = fixedChoices(mathChoice(`5 ${X} 2`), [mathChoice('5 + 2'), mathChoice(`2 ${X} 2`), mathChoice(`5 ${X} 5`)], 2);
-            return tq('multMeaning', 'mm1', 'איזה תרגיל מתאים לציור?', [{ kind: 'choice', choices, answer, hint: 'כמה מסגרות (קבוצות) יש? וכמה עיגולים בכל קבוצה?' }],
-              `יש 5 קבוצות, ובכל אחת 2 עיגולים. התרגיל: ${m(`5 ${X} 2 = 10`)}.`,
-              { figure: groupsFigure([2, 2, 2, 2, 2]) });
+            return tq('multMeaning', 'mm1', 'איזה תרגיל מתאים לציור?', [{ kind: 'choice', choices, answer, hint: 'כמה מסגרות (קבוצות) יש? וכמה רובוטים בכל קבוצה?' }],
+              `יש 5 קבוצות, ובכל אחת 2 רובוטים. התרגיל: ${m(`5 ${X} 2 = 10`)}.`,
+              { figure: groupsFigure([2, 2, 2, 2, 2], { item: 'robot' }) });
           })(),
         },
       ],

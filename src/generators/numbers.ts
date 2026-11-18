@@ -1,7 +1,7 @@
 import { CONFIG } from '../config';
 import type { Level, Question, Part } from '../types';
 import type { Rng } from '../rng';
-import { fmt, m, X, D, MINUS, BLANK, makeChoices, mathChoice, textChoice, placeName, countWord } from '../format';
+import { fmt, m, X, D, MINUS, BLANK, makeChoices, mathChoice, textChoice } from '../format';
 import { numberLine, sequenceFigure, groupsFigure } from '../figures';
 
 const T = CONFIG.timesTableMax;
@@ -9,191 +9,6 @@ const MAXN = CONFIG.maxNumber;
 
 function num(answer: number, hint: string, extra: Partial<Part> = {}): Part {
   return { kind: 'number', answer: String(answer), hint, ...extra };
-}
-
-/* ============================================================ מבנה עשרוני */
-
-export function placeValue(rng: Rng, level: Level): Question {
-  const topic = 'placeValue' as const;
-  if (level === 1) {
-    const d = [rng.int(1, 9), rng.int(1, 9), rng.int(1, 9), rng.int(1, 9)]; // th,h,t,u
-    const n = d[0] * 1000 + d[1] * 100 + d[2] * 10 + d[3];
-    if (rng.bool()) {
-      return {
-        topic, level, sig: `pv-compose-${n}`,
-        prompt: 'הרכיבי את המספר. כתבי את התוצאה.',
-        math: `${fmt(d[0] * 1000)} + ${d[1] * 100} + ${d[2] * 10} + ${d[3]} = ${BLANK}`,
-        parts: [num(n, 'כל מחובר מתאים למקום אחר: אלפים, מאות, עשרות ויחידות. כתבי ספרה אחת לכל מקום.')],
-        explanation: `${countWord(d[0], 3)}, ${countWord(d[1], 2)}, ${countWord(d[2], 1)} ו־${countWord(d[3], 0)}. כותבים את הספרות לפי הסדר: ${m(fmt(n))}.`,
-      };
-    }
-    const missP = rng.int(1, 2); // hundreds or tens
-    const vals = [d[0] * 1000, d[1] * 100, d[2] * 10, d[3]];
-    const idx = 3 - missP;
-    const shown = vals.map((v, i) => (i === idx ? BLANK : fmt(v)));
-    return {
-      topic, level, sig: `pv-decomp-${n}-${missP}`,
-      prompt: 'השלימי את הפירוק של המספר.',
-      math: `${fmt(n)} = ${shown.join(' + ')}`,
-      parts: [num(vals[idx], `מצאי את הספרה במקום ה${placeName(missP)}. כמה היא שווה?`)],
-      explanation: `במספר ${m(fmt(n))} הספרה ${d[idx]} נמצאת במקום ה${placeName(missP)}, ולכן היא שווה ${m(fmt(vals[idx]))}.`,
-    };
-  }
-  if (level === 2) {
-    // numbers with a zero
-    const zeroAt = rng.pick([1, 2]); // tens or hundreds is 0
-    const ds = [rng.int(1, 9), rng.int(1, 9), rng.int(1, 9), rng.int(1, 9)]; // [u,t,h,th]
-    ds[zeroAt] = 0;
-    const n = ds[3] * 1000 + ds[2] * 100 + ds[1] * 10 + ds[0];
-    const words = [3, 2, 1, 0].filter((p) => ds[p] !== 0).map((p) => countWord(ds[p], p));
-    if (rng.bool()) {
-      const text = words.slice(0, -1).join(', ') + ' ו־' + words[words.length - 1];
-      return {
-        topic, level, sig: `pv-words0-${n}`,
-        prompt: `כתבי את המספר: <b>${text}</b>.`,
-        parts: [num(n, `אין ${placeName(zeroAt)} במספר. מה כותבים במקום ה${placeName(zeroAt)}?`)],
-        explanation: `כותבים ספרה לכל מקום: אלפים ${ds[3]}, מאות ${ds[2]}, עשרות ${ds[1]}, יחידות ${ds[0]}. במקום שאין בו כלום כותבים 0. לכן המספר הוא ${m(fmt(n))}.`,
-      };
-    }
-    const nonzero = [3, 2, 1, 0].filter((p) => ds[p] !== 0);
-    const missP = rng.pick(nonzero.filter((p) => p !== 3));
-    const terms = nonzero.map((p) => (p === missP ? BLANK : fmt(ds[p] * 10 ** p)));
-    return {
-      topic, level, sig: `pv-decomp0-${n}-${missP}`,
-      prompt: 'השלימי את הפירוק. שימי לב לאפס.',
-      math: `${fmt(n)} = ${terms.join(' + ')}`,
-      parts: [num(ds[missP] * 10 ** missP, `באיזה מקום נמצאת הספרה ${ds[missP]} במספר ${fmt(n)}? כמה היא שווה?`)],
-      explanation: `במספר ${m(fmt(n))} יש 0 ב${placeName(zeroAt)}, ולכן לא כותבים אותן בפירוק. הספרה ${ds[missP]} נמצאת במקום ה${placeName(missP)} ושווה ${m(fmt(ds[missP] * 10 ** missP))}.`,
-    };
-  }
-  // level 3
-  const ds = [rng.int(0, 9), rng.int(0, 9), rng.int(0, 9), rng.int(1, 9)];
-  if (ds.filter((x) => x === 0).length === 0) ds[rng.int(0, 2)] = 0;
-  if (ds.filter((x) => x !== 0).length < 3) ds[ds.indexOf(0) === 3 ? 2 : ds.indexOf(0)] = rng.int(1, 9);
-  const n = ds[3] * 1000 + ds[2] * 100 + ds[1] * 10 + ds[0];
-  const nonzero = [3, 2, 1, 0].filter((p) => ds[p] !== 0);
-  if (rng.bool()) {
-    // words in mixed order
-    const order = rng.shuffle(nonzero);
-    const words = order.map((p) => countWord(ds[p], p));
-    const text = words.slice(0, -1).join(', ') + ' ו־' + words[words.length - 1];
-    return {
-      topic, level, sig: `pv-mixed-${n}`,
-      prompt: `כתבי את המספר. שימי לב – הסדר מבולבל: <b>${text}</b>.`,
-      parts: [num(n, 'סדרי לפי המקומות: קודם אלפים, אחר כך מאות, עשרות ויחידות. במקום ריק כותבים 0.')],
-      explanation: `מסדרים: אלפים ${ds[3]}, מאות ${ds[2]}, עשרות ${ds[1]}, יחידות ${ds[0]}. המספר הוא ${m(fmt(n))}.`,
-    };
-  }
-  // choose the right decomposition
-  const termsOf = (vals: number[]) => vals.filter((v) => v !== 0).map(fmt).join(' + ');
-  const correctVals = nonzero.map((p) => ds[p] * 10 ** p);
-  const distract: string[] = [];
-  for (const p of nonzero) {
-    for (const shift of [-1, 1]) {
-      const np = p + shift;
-      if (np < 0 || np > 3) continue;
-      const vals = nonzero.map((q) => (q === p ? ds[q] * 10 ** np : ds[q] * 10 ** q));
-      const sum = vals.reduce((a, b) => a + b, 0);
-      if (sum === n) continue;
-      const lab = termsOf(vals.slice().sort((a, b) => b - a));
-      if (!distract.includes(lab) && lab !== termsOf(correctVals)) distract.push(lab);
-    }
-  }
-  const picked = rng.sample(distract, 3);
-  const { choices, answer } = makeChoices(rng, mathChoice(termsOf(correctVals)), picked.map(mathChoice));
-  return {
-    topic, level, sig: `pv-choose-${n}`,
-    prompt: `איזה פירוק מתאים למספר <b>${fmt(n)}</b>?`,
-    parts: [{ kind: 'choice', choices, answer, hint: 'בדקי כל ספרה: באיזה מקום היא נמצאת? אפס לא כותבים בפירוק.' }],
-    explanation: `${nonzero.map((p) => `${ds[p]} ב${placeName(p)} = ${m(fmt(ds[p] * 10 ** p))}`).join('; ')}. לכן ${m(`${fmt(n)} = ${termsOf(correctVals)}`)}.`,
-  };
-}
-
-/* ============================================================ ערך הספרה */
-
-function distinctDigitsNumber(rng: Rng, len: number, allowZero = true): number[] {
-  // returns digits [u,t,h,(th)] distinct, leading non-zero
-  for (;;) {
-    const pool = allowZero ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] : [1, 2, 3, 4, 5, 6, 7, 8, 9];
-    const ds = rng.sample(pool, len);
-    if (ds[len - 1] !== 0) return ds;
-  }
-}
-const fromDigits = (ds: number[]) => ds.reduce((s, d, p) => s + d * 10 ** p, 0);
-
-export function digitValue(rng: Rng, level: Level): Question {
-  const topic = 'digitValue' as const;
-  const hintRight = 'התחילי מימין: הספרה הראשונה מימין היא ספרת היחידות, אחריה עשרות, מאות ואלפים.';
-  if (level === 1) {
-    const len = rng.pick([3, 4]);
-    const ds = distinctDigitsNumber(rng, len);
-    const nz = ds.map((d, p) => ({ d, p })).filter((x) => x.d !== 0 && x.p > 0);
-    const t = rng.pick(nz);
-    const n = fromDigits(ds);
-    return {
-      topic, level, sig: `dv-val-${n}-${t.p}`,
-      prompt: `מה הערך של הספרה <b>${t.d}</b> במספר <b>${fmt(n)}</b>?`,
-      parts: [num(t.d * 10 ** t.p, `${hintRight} באיזה מקום נמצאת הספרה ${t.d}?`)],
-      explanation: `הספרה ${t.d} נמצאת במקום ה${placeName(t.p)}. ${countWord(t.d, t.p)} הן ${m(fmt(t.d * 10 ** t.p))}, לכן הערך שלה הוא ${m(fmt(t.d * 10 ** t.p))}.`,
-    };
-  }
-  if (level === 2) {
-    // which place? number has a zero somewhere
-    const ds = distinctDigitsNumber(rng, 4, true);
-    if (!ds.includes(0)) ds[rng.int(0, 2)] = 0;
-    const cand = ds.map((d, p) => ({ d, p })).filter((x) => ds.filter((y) => y === x.d).length === 1);
-    const t = rng.pick(cand);
-    const n = fromDigits(ds);
-    const { choices, answer } = makeChoices(null, textChoice(placeName(t.p)), [0, 1, 2, 3].filter((p) => p !== t.p).map((p) => textChoice(placeName(p))));
-    // keep a fixed, logical order: אלפים, מאות, עשרות, יחידות
-    const order = ['אלפים', 'מאות', 'עשרות', 'יחידות'];
-    choices.sort((a, b) => order.indexOf(a.text) - order.indexOf(b.text));
-    return {
-      topic, level, sig: `dv-place-${n}-${t.p}`,
-      prompt: `באיזה מקום נמצאת הספרה <b>${t.d}</b> במספר <b>${fmt(n)}</b>?`,
-      parts: [{ kind: 'choice', choices, answer, hint: `${hintRight} ספרי מקומות עד שתגיעי ל־${t.d}.` }],
-      explanation: `במספר ${m(fmt(n))}: ${[3, 2, 1, 0].map((p) => `${placeName(p)} – ${ds[p]}`).join(', ')}. לכן הספרה ${t.d} נמצאת במקום ה${placeName(t.p)}.`,
-    };
-  }
-  // level 3
-  if (rng.bool()) {
-    // repeated digit; ask for value at a named place (e.g. "the 4 in the hundreds place")
-    const d = rng.int(1, 9);
-    const places = rng.sample([0, 1, 2, 3], 2);
-    const ds = [0, 0, 0, 0].map(() => rng.pick([0, 1, 2, 3, 4, 5, 6, 7, 8, 9].filter((x) => x !== d)));
-    for (const p of places) ds[p] = d;
-    if (ds[3] === 0) ds[3] = d === 9 ? 1 : d + 1;
-    const tp = rng.pick(places);
-    const n = fromDigits(ds);
-    if (ds.filter((x) => x === d).length !== 2) return digitValue(rng, level);
-    return {
-      topic, level, sig: `dv-rep-${n}-${tp}`,
-      prompt: `במספר <b>${fmt(n)}</b> הספרה ${d} מופיעה פעמיים. מה הערך של הספרה ${d} שנמצאת במקום ה<b>${placeName(tp)}</b>?`,
-      parts: [num(d * 10 ** tp, `${countWord(d, tp)} – כמה זה?`)],
-      explanation: `הספרה ${d} במקום ה${placeName(tp)} שווה ${countWord(d, tp)}, כלומר ${m(fmt(d * 10 ** tp))}.`,
-    };
-  }
-  // which number has digit d worth d*10^p
-  const d = rng.int(1, 9);
-  const tp = rng.int(0, 3);
-  const make = (p: number) => {
-    const others = rng.sample([0, 1, 2, 3, 4, 5, 6, 7, 8, 9].filter((x) => x !== d), 3);
-    const ds: number[] = [];
-    let k = 0;
-    for (let q = 0; q < 4; q++) ds[q] = q === p ? d : others[k++];
-    if (ds[3] === 0) ds[3] = [1, 2, 3, 4, 5, 6, 7, 8, 9].find((x) => x !== d && !ds.includes(x))!;
-    return fromDigits(ds);
-  };
-  const correct = make(tp);
-  const dis = [0, 1, 2, 3].filter((p) => p !== tp).map(make);
-  const { choices, answer } = makeChoices(rng, mathChoice(fmt(correct)), dis.map((x) => mathChoice(fmt(x))));
-  const val = d * 10 ** tp;
-  return {
-    topic, level, sig: `dv-which-${d}-${tp}-${correct}`,
-    prompt: `באיזה מספר הספרה ${d} שווה <b>${fmt(val)}</b>?`,
-    parts: [{ kind: 'choice', choices, answer, hint: `${fmt(val)} זה ${countWord(d, tp)}. חפשי מספר שבו ${d} נמצאת במקום ה${placeName(tp)}.` }],
-    explanation: `${m(fmt(val))} = ${countWord(d, tp)}. רק במספר ${m(fmt(correct))} הספרה ${d} נמצאת במקום ה${placeName(tp)}.`,
-  };
 }
 
 /* ============================================================ קודם ועוקב */
@@ -502,8 +317,7 @@ export function sequences(rng: Rng, level: Level): Question {
 /* ============================================================ משמעות הכפל */
 
 const ITEMS = [
-  { one: 'עיגולים', fig: 'dot' as const },
-  { one: 'כוכבים', fig: 'star' as const },
+  { one: 'רובוטים', fig: 'robot' as const },
 ];
 
 export function multMeaning(rng: Rng, level: Level): Question {
@@ -629,4 +443,4 @@ export function wordProblems(rng: Rng, level: Level): Question {
 }
 
 /* ============================================================ helpers for tests */
-export const _internal = { calc, fromDigits };
+export const _internal = { calc };

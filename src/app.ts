@@ -1,14 +1,16 @@
 import { CONFIG } from './config';
-import type { Question, TopicId } from './types';
+import type { Part, Question, TopicId } from './types';
 import { Rng } from './rng';
 import { TOPICS, topicById } from './topics';
 import { buildTopicRound, buildMixed, buildExam, isCorrectAnswer, type Stats } from './rounds';
 import { getLesson } from './lessons';
 import { esc, renderBlank } from './format';
+import { checkPart, splitFields, isFilled } from './answers';
+import { robot, packs } from './space';
 
 /* ================================================================== state */
 
-interface PartProg { attempts: number; status: 'open' | 'correct' | 'failed'; wrong: string[] }
+interface PartProg { attempts: number; status: 'open' | 'correct' | 'failed'; wrong: string[]; values?: string[]; bad?: boolean[]; hintText?: string }
 type Screen =
   | { name: 'home' }
   | { name: 'topics' }
@@ -60,7 +62,9 @@ function remember(qs: Question[]) {
 
 /* ================================================================== navigation */
 
-function go(screen: Screen) { state.screen = screen; scrollTop = true; save(); render(); }
+function go(screen: Screen) { state.screen = screen; scrollTop = true; openBays.clear(); save(); render(); }
+/** cargo bays opened in worked examples (cargo id → place) – kept while the screen stays open */
+const openBays = new Map<string, string>();
 
 function startTopic(topic: TopicId) {
   const questions = buildTopicRound(rng, topic, state.recent);
@@ -101,18 +105,33 @@ function answer(key: string, partIdx: number, value: string) {
   const r = runnerFor(key);
   if (!r) return;
   const pp = r.prog[partIdx];
+  const part = r.q.parts[partIdx];
   if (pp.status !== 'open') return;
-  if (value.trim() === '') { focusSel = `[data-input="${key}-${partIdx}"]`; render(); return; }
-  if (isCorrectAnswer(r.q, partIdx, value)) {
+  const res = checkPart(part, value);
+  if (part.kind === 'fields') pp.values = splitFields(value, part.fields!.length);
+  const firstField = `[data-field="${key}-${partIdx}-0"]`;
+  if (res.empty) {
+    focusSel = part.kind === 'fields' ? firstField : `[data-input="${key}-${partIdx}"]`;
+    pp.hintText = part.kind === 'fields' ? 'מלאי ספרה בכל אחת מארבע השורות ואז לחצי על ״בדיקה״.' : pp.hintText;
+    save(); render(); return;
+  }
+  if (res.ok) {
     pp.status = 'correct';
+    pp.bad = undefined;
   } else {
     pp.attempts += 1;
     pp.wrong.push(value);
+    pp.bad = res.bad;
+    pp.hintText = res.emptyZero && part.zeroHint ? part.zeroHint : res.trap ?? part.hint;
     if (pp.attempts >= 2) pp.status = 'failed';
-    else focusSel = `[data-input="${key}-${partIdx}"]`;
+    else if (part.kind === 'fields') {
+      const i = (res.bad ?? []).findIndex(Boolean);
+      focusSel = `[data-field="${key}-${partIdx}-${Math.max(0, i)}"]`;
+    } else focusSel = `[data-input="${key}-${partIdx}"]`;
   }
   // next part gets focus
-  if (pp.status !== 'open' && r.q.parts[partIdx + 1]?.kind === 'number') focusSel = `[data-input="${key}-${partIdx + 1}"]`;
+  const next = r.q.parts[partIdx + 1];
+  if (pp.status !== 'open' && next && next.kind !== 'choice') focusSel = next.kind === 'fields' ? `[data-field="${key}-${partIdx + 1}-0"]` : `[data-input="${key}-${partIdx + 1}"]`;
   if (key === 'P' && r.prog.every((p) => p.status !== 'open')) countStats();
   save();
   render();
@@ -148,7 +167,13 @@ function progressBar(i: number, n: number, label = 'שאלה') {
 function questionHead(q: Question) {
   return `<div class="q-prompt">${q.prompt}</div>` +
     (q.math ? `<div class="q-math${q.math.length > 17 ? ' q-math-long' : ''}" dir="ltr">${renderBlank(esc(q.math))}</div>` : '') +
-    (q.figure ? `<div class="q-figure">${q.figure}</div>` : '');
+    (q.figure ? (GEO.includes(q.topic) ? geoTray(q.figure) : `<div class="q-figure">${q.figure}</div>`) : GEO.includes(q.topic) ? geoTray('') : '');
+}
+
+const GEO: TopicId[] = ['angles', 'polygons', 'triangles'];
+/** geometry figures are "parts" that Robi collects for the spaceship */
+function geoTray(fig: string): string {
+  return `<div class="tray${fig ? '' : ' tray-empty'}"><div class="tray-label">${robot('collect', 34)}<span>${fig ? 'רובי אוסף חלק לחללית' : 'עזרי לרובי לבחור את החלק הנכון לחללית'}</span></div>${fig ? `<div class="q-figure">${fig}</div>` : ''}</div>`;
 }
 
 function choiceGridClass(q: Question, pi: number) {
@@ -159,24 +184,57 @@ function choiceGridClass(q: Question, pi: number) {
   return cs.length <= 2 ? 'choices choices-2' : 'choices';
 }
 
+function inputAttrs(kind: 'number' | 'text'): string {
+  return kind === 'number'
+    ? 'type="text" inputmode="numeric" pattern="[0-9]*" data-numeric="1" dir="ltr"'
+    : 'type="text" inputmode="text" lang="he" dir="rtl" autocapitalize="off" autocorrect="off" spellcheck="false"';
+}
+
+/** text / number answer box (+ the short instruction under it) */
+function answerBox(part: Part, attrs: string, value = ''): string {
+  const kind = part.kind === 'text' ? 'text' : 'number';
+  const hintId = attrs.match(/data-(?:input|exam-input)="([^"]+)"/)?.[1] ?? '';
+  return `<div class="answer-box"><div class="num-form-row"><input class="num-input${kind === 'text' ? ' text-input' : ''}" ${inputAttrs(kind)} ${attrs} enterkeyhint="done" autocomplete="off" aria-label="התשובה שלך" ${part.fieldHint ? `aria-describedby="fh-${esc(hintId)}"` : ''} value="${esc(value)}" />${part.suffix ? `<span class="suffix">${part.suffix}</span>` : ''}</div>${part.fieldHint ? `<div class="field-hint" id="fh-${esc(hintId)}">${part.fieldHint}</div>` : ''}</div>`;
+}
+
+/** notebook rows: [ box ] label — box first, in Hebrew reading order */
+function fieldRows(part: Part, values: string[], attr: (i: number) => string, state: { bad?: boolean[]; locked?: boolean; reveal?: boolean } = {}): string {
+  return `<div class="frows">${part.fields!.map((f, i) => {
+    const bad = state.bad?.[i];
+    const v = state.reveal && bad ? f.answer : values[i] ?? '';
+    const mark = state.locked ? (bad ? `<span class="fmark fmark-bad">✗ התשובה: ${esc(f.answer)}</span>` : '<span class="fmark fmark-ok">✓</span>') : bad ? '<span class="fmark fmark-bad">✗ לתיקון</span>' : '';
+    return `<div class="frow${bad ? ' frow-bad' : ''}"><input class="num-input field-input" ${inputAttrs('number')} ${attr(i)} enterkeyhint="${i < 3 ? 'next' : 'done'}" autocomplete="off" aria-label="${f.label}" value="${esc(v)}" ${state.locked ? 'readonly' : ''} /><span class="flabel">${f.label}</span>${mark}</div>`;
+  }).join('')}</div>`;
+}
+
+function feedbackGood(first: boolean): string {
+  return `<div class="good" role="status">${robot('wave', 52)}<span>${first ? 'כל הכבוד! 🎉 רובי מנופף לך!' : 'יפה! הצלחת בניסיון השני 👏'}</span></div>`;
+}
+
 /** Interactive question with hints (practice + lesson "עכשיו תורך") */
 function renderRunner(q: Question, prog: PartProg[], key: string): string {
   let h = questionHead(q);
   const active = prog.findIndex((p) => p.status === 'open');
   const done = active === -1;
+  const hinted = prog.some((p) => p.attempts > 0);
   q.parts.forEach((part, pi) => {
     if (!done && pi > active) return;
     const pp = prog[pi];
     h += `<div class="part" data-part-box="${pi}">`;
     if (part.prompt) h += `<div class="part-prompt">${part.prompt}</div>`;
-    if (part.kind === 'number') {
+    if (part.kind === 'number' || part.kind === 'text') {
       if (pp.status === 'open') {
-        h += `<form class="num-form" data-key="${key}" data-part="${pi}" autocomplete="off">
-          <input class="num-input" data-input="${key}-${pi}" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" aria-label="התשובה שלך" dir="ltr" />
-          ${part.suffix ? `<span class="suffix">${part.suffix}</span>` : ''}
-          <button type="submit" class="btn btn-primary">בדיקה</button></form>`;
+        h += `<form class="num-form" data-key="${key}" data-part="${pi}" autocomplete="off">${answerBox(part, `data-input="${key}-${pi}"`)}<button type="submit" class="btn btn-primary">בדיקה</button></form>`;
       } else {
-        h += `<div class="num-result ${pp.status}" dir="rtl"><span class="mark" aria-hidden="true">${pp.status === 'correct' ? '✓' : '✗'}</span> ${pp.status === 'correct' ? 'נכון' : 'התשובה הנכונה'}: <b class="m" dir="ltr">${esc(part.answer)}</b>${part.suffix ? ' ' + part.suffix : ''}</div>`;
+        const shown = part.kind === 'text' ? esc(part.answer) : `<b class="m" dir="ltr">${esc(part.answer)}</b>`;
+        h += `<div class="num-result ${pp.status}" dir="rtl"><span class="mark" aria-hidden="true">${pp.status === 'correct' ? '✓' : '✗'}</span> ${pp.status === 'correct' ? 'נכון' : 'התשובה הנכונה'}: <b>${shown}</b>${part.suffix ? ' ' + part.suffix : ''}</div>`;
+      }
+    } else if (part.kind === 'fields') {
+      const vals = pp.values ?? part.fields!.map(() => '');
+      if (pp.status === 'open') {
+        h += `<form class="fields-form" data-key="${key}" data-part="${pi}" autocomplete="off">${fieldRows(part, vals, (i) => `data-field="${key}-${pi}-${i}"`, { bad: pp.attempts > 0 ? pp.bad : undefined })}${part.fieldHint ? `<div class="field-hint">${part.fieldHint}</div>` : ''}<button type="submit" class="btn btn-primary btn-wide">בדיקה</button></form>`;
+      } else {
+        h += fieldRows(part, vals, (i) => `data-field-done="${i}"`, { bad: pp.status === 'failed' ? pp.bad : part.fields!.map(() => false), locked: true, reveal: pp.status === 'failed' });
       }
     } else {
       h += `<div class="${choiceGridClass(q, pi)}" role="group">`;
@@ -192,16 +250,20 @@ function renderRunner(q: Question, prog: PartProg[], key: string): string {
       }
       h += `</div>`;
     }
-    if (pp.status === 'open' && pp.attempts === 1) {
-      h += `<div class="hint" role="status"><b>💡 רמז:</b> ${part.hint}<div class="try-again">נסי שוב!</div></div>`;
+    if (pp.status === 'open' && (pp.attempts === 1 || (pp.attempts === 0 && pp.hintText))) {
+      h += `<div class="hint" role="status">${robot('think', 44)}<div><b>💡 ${pp.attempts ? 'רמז' : 'שימי לב'}:</b> ${pp.hintText ?? part.hint}${pp.attempts ? '<div class="try-again">נסי שוב!</div>' : ''}</div></div>`;
     }
-    if (pp.status === 'correct') h += `<div class="good" role="status">${pp.attempts === 0 ? 'כל הכבוד! 🎉' : 'יפה! הצלחת בניסיון השני 👏'}</div>`;
+    if (pp.status !== 'open' && part.after) h += `<div class="after">${part.after}</div>`;
+    if (pp.status === 'correct') h += feedbackGood(pp.attempts === 0);
     h += `</div>`;
   });
+  // a picture that gives the answer away appears only with the hint or after checking
+  // (for the 4-box decomposition only after checking – it would show all four digits)
+  if (q.hintFigure && (done || (hinted && !q.parts.some((p) => p.kind === 'fields')))) h += `<div class="hint-figure"><div class="hint-figure-label">${done ? 'ככה זה נראה בחללית:' : 'רמז מהחללית:'}</div>${q.hintFigure}</div>`;
   if (done) {
     const anyFail = prog.some((p) => p.status === 'failed');
     h += anyFail
-      ? `<div class="explain" role="status"><b>פתרון מוסבר:</b> ${q.explanation}</div>`
+      ? `<div class="explain" role="status">${robot('idle', 40)}<div><b>פתרון מוסבר:</b> ${q.explanation}</div></div>`
       : `<details class="explain-more"><summary>איך פותרים?</summary><div>${q.explanation}</div></details>`;
   }
   return h;
@@ -225,12 +287,12 @@ function homeView(): string {
     resume += `<button class="card card-resume" data-act="continue-practice"><span class="card-icon">▶️</span><span><b>להמשיך מאיפה שעצרת</b><br><small>${what} – שאלה ${p.index + 1} מתוך ${p.questions.length}</small></span></button>`;
   }
   if (state.exam && !state.exam.submitted) {
-    resume += `<button class="card card-resume" data-act="continue-exam"><span class="card-icon">▶️</span><span><b>להמשיך את המבחן לדוגמה</b><br><small>ענית על ${state.exam.answers.filter((a) => a.every((x) => x !== '')).length} מתוך ${state.exam.questions.length}</small></span></button>`;
+    resume += `<button class="card card-resume" data-act="continue-exam"><span class="card-icon">▶️</span><span><b>להמשיך את המבחן לדוגמה</b><br><small>ענית על ${state.exam.questions.filter((q, i) => q.parts.every((p, pi) => isFilled(p, state.exam!.answers[i][pi]))).length} מתוך ${state.exam.questions.length}</small></span></button>`;
   }
   const weak = TOPICS.filter((t) => (state.stats[t.id]?.wrong ?? 0) > 0)
     .sort((a, b) => (state.stats[b.id]!.wrong / state.stats[b.id]!.seen) - (state.stats[a.id]!.wrong / state.stats[a.id]!.seen)).slice(0, 3);
   return `<main class="screen home">
-    <h1 class="app-title">המתמטיקה של נועה</h1>
+    <div class="hello">${robot('wave', 64)}<div><h1 class="app-title">המתמטיקה של נועה</h1><p class="hello-text">שלום נועה! אני רובי מתחנת החלל. בואי נתרגל יחד.</p></div></div>
     <p class="sub">${d > 0 ? `עוד ${d} ימים למבחן (יום חמישי, 3.12) 💪` : d === 0 ? 'היום המבחן! בהצלחה 🍀' : 'בהצלחה בהמשך! 🌟'}</p>
     ${resume}
     <nav class="modes" aria-label="דרכי תרגול">
@@ -325,7 +387,7 @@ function examView(): string {
   const e = state.exam!;
   const q = e.questions[e.index];
   const n = e.questions.length;
-  const answered = (i: number) => e.answers[i].every((a) => a !== '');
+  const answered = (i: number) => e.questions[i].parts.every((p, pi) => isFilled(p, e.answers[i][pi]));
   if (e.confirm) {
     const missing = e.answers.map((_, i) => i).filter((i) => !answered(i));
     return `${header('מבחן לדוגמה', null)}<main class="screen"><div class="confirm">
@@ -342,8 +404,10 @@ function examView(): string {
   q.parts.forEach((part, pi) => {
     const val = e.answers[e.index][pi];
     h += `<div class="part">${part.prompt ? `<div class="part-prompt">${part.prompt}</div>` : ''}`;
-    if (part.kind === 'number') {
-      h += `<div class="num-form"><input class="num-input" data-exam-input="${pi}" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" aria-label="התשובה שלך" dir="ltr" value="${esc(val)}" />${part.suffix ? `<span class="suffix">${part.suffix}</span>` : ''}</div>`;
+    if (part.kind === 'number' || part.kind === 'text') {
+      h += `<div class="num-form">${answerBox(part, `data-exam-input="${pi}"`, val)}</div>`;
+    } else if (part.kind === 'fields') {
+      h += fieldRows(part, splitFields(val, part.fields!.length), (i) => `data-exam-field="${pi}:${i}"`) + (part.fieldHint ? `<div class="field-hint">${part.fieldHint}</div>` : '');
     } else {
       h += `<div class="${choiceGridClass(q, pi)}" role="group">` + part.choices!.map((c) =>
         `<button type="button" class="choice${val === c.id ? ' selected' : ''}" aria-pressed="${val === c.id}" data-act="exam-choose" data-part="${pi}" data-choice="${c.id}">${val === c.id ? '<span class="mark">●</span>' : ''}<span class="choice-body">${c.html}</span></button>`).join('') + `</div>`;
@@ -387,8 +451,13 @@ function examResultsView(): string {
 
 function answerHtml(q: Question, pi: number, val: string): string {
   const part = q.parts[pi];
-  if (!val) return '<i>לא נענתה</i>';
+  if (!val || (part.kind === 'fields' && !val.replace(/\|/g, '').trim())) return '<i>לא נענתה</i>';
   if (part.kind === 'number') return `<b class="m" dir="ltr">${esc(val)}</b>`;
+  if (part.kind === 'text') return `<b>${esc(val)}</b>`;
+  if (part.kind === 'fields') {
+    const vs = splitFields(val, part.fields!.length);
+    return part.fields!.map((f, i) => `<span class="nowrap"><b>${esc(vs[i] || '–')}</b> ${f.label}</span>`).join(', ');
+  }
   const c = part.choices!.find((x) => x.id === val);
   return c ? `<span class="ans-choice">${c.html}</span>` : '';
 }
@@ -402,7 +471,7 @@ function reviewView(): string {
     ${q.parts.map((part, pi) => `<div class="rev-part">${part.prompt ? `<div class="part-prompt">${part.prompt}</div>` : ''}
       <div>התשובה שלך: ${answerHtml(q, pi, e.answers[i][pi])} ${isCorrectAnswer(q, pi, e.answers[i][pi]) ? '✓' : '✗'}</div>
       ${isCorrectAnswer(q, pi, e.answers[i][pi]) ? '' : `<div>התשובה הנכונה: ${answerHtml(q, pi, part.answer)}</div>`}</div>`).join('')}
-    <div class="explain"><b>פתרון מוסבר:</b> ${q.explanation}</div>
+    <div class="explain"><div><b>פתרון מוסבר:</b> ${q.explanation}</div></div>
   </article>`).join('')}
   <div class="col">${btn('back-to-results', 'חזרה לתוצאות', 'btn btn-primary btn-wide')}</div></main>`;
 }
@@ -423,6 +492,10 @@ export function render() {
     case 'review': html = state.exam?.correct ? reviewView() : homeView(); break;
   }
   root.innerHTML = html;
+  for (const [id, place] of openBays) {
+    const bay = root.querySelector<HTMLElement>(`[data-cargo-id="${id}"] [data-act=bay][data-place="${place}"]`);
+    if (bay) openBay(bay);
+  }
   if (scrollTop) { window.scrollTo(0, 0); scrollTop = false; }
   if (focusSel) {
     const el = root.querySelector<HTMLInputElement>(focusSel);
@@ -450,6 +523,7 @@ function onClick(ev: Event) {
     case 'back-to-practice': go({ name: 'practice' }); break;
     case 'back-to-results': go({ name: 'examResults' }); break;
     case 'choose': answer(el.dataset.key!, Number(el.dataset.part), el.dataset.choice!); break;
+    case 'bay': openBay(el); break;
     case 'retry-lesson': delete state.lessonTry[el.dataset.key!]; save(); render(); break;
     case 'next-q': {
       const p = state.practice!;
@@ -479,6 +553,13 @@ function onClick(ev: Event) {
 }
 
 function onSubmit(ev: Event) {
+  const ff = (ev.target as HTMLElement).closest<HTMLFormElement>('form.fields-form');
+  if (ff) {
+    ev.preventDefault();
+    const vals = [...ff.querySelectorAll<HTMLInputElement>('input[data-field]')].map((i) => i.value.trim());
+    answer(ff.dataset.key!, Number(ff.dataset.part), vals.join('|'));
+    return;
+  }
   const form = (ev.target as HTMLElement).closest<HTMLFormElement>('form.num-form');
   if (!form) return;
   ev.preventDefault();
@@ -488,18 +569,54 @@ function onSubmit(ev: Event) {
 
 function onInput(ev: Event) {
   const t = ev.target as HTMLInputElement;
-  if (t.dataset.examInput !== undefined && state.exam) {
-    // keep digits only (numeric keyboard may still allow other chars)
-    const clean = t.value.replace(/[^\d]/g, '');
-    if (clean !== t.value) t.value = clean;
-    state.exam.answers[state.exam.index][Number(t.dataset.examInput)] = clean;
-    save();
-    const chip = root.querySelector(`.qchip[data-i="${state.exam.index}"]`);
-    chip?.classList.toggle('answered', state.exam.answers[state.exam.index].every((a) => a !== ''));
-  } else if (t.classList.contains('num-input')) {
+  if (t.dataset.numeric) {
+    // numeric boxes keep digits only (the numeric keyboard may still allow other characters)
     const clean = t.value.replace(/[^\d]/g, '');
     if (clean !== t.value) t.value = clean;
   }
+  const e = state.exam;
+  if (t.dataset.examInput !== undefined && e) {
+    e.answers[e.index][Number(t.dataset.examInput)] = t.value;
+  } else if (t.dataset.examField !== undefined && e) {
+    const [pi, i] = t.dataset.examField.split(':').map(Number);
+    const part = e.questions[e.index].parts[pi];
+    const vs = splitFields(e.answers[e.index][pi], part.fields!.length);
+    vs[i] = t.value;
+    e.answers[e.index][pi] = vs.join('|');
+  } else if (t.dataset.field) {
+    // keep what Noa typed in the decomposition boxes (survives leaving the screen)
+    const [key, pi, i] = splitKey(t.dataset.field);
+    const r = runnerFor(key);
+    if (r) {
+      const part = r.q.parts[pi];
+      const pp = r.prog[pi];
+      pp.values = pp.values ?? part.fields!.map(() => '');
+      pp.values[i] = t.value;
+    }
+  } else return;
+  save();
+  if (e && (t.dataset.examInput !== undefined || t.dataset.examField !== undefined)) {
+    const q = e.questions[e.index];
+    root.querySelector(`.qchip[data-i="${e.index}"]`)?.classList.toggle('answered', q.parts.every((p, pi) => isFilled(p, e.answers[e.index][pi])));
+  }
+}
+
+/** "L:digitValue:0-0-2" → ["L:digitValue:0", 0, 2] */
+function splitKey(s: string): [string, number, number] {
+  const m = s.match(/^(.*)-(\d+)-(\d+)$/)!;
+  return [m[1], Number(m[2]), Number(m[3])];
+}
+
+function openBay(el: HTMLElement) {
+  const cargo = el.closest('.cargo');
+  if (!cargo) return;
+  cargo.querySelectorAll('.bay').forEach((b) => { b.classList.remove('bay-open'); b.setAttribute('aria-pressed', 'false'); });
+  el.classList.add('bay-open');
+  el.setAttribute('aria-pressed', 'true');
+  const panel = cargo.querySelector('.bay-packs');
+  if (panel) panel.innerHTML = packs(Number(el.dataset.digit), Number(el.dataset.place));
+  const id = (cargo as HTMLElement).dataset.cargoId;
+  if (id) openBays.set(id, el.dataset.place!);
 }
 
 export function mount(el: HTMLElement) {

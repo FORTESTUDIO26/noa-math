@@ -1,9 +1,11 @@
 import { CONFIG } from './config';
-import type { Level, Question, TopicId } from './types';
+import type { Choice, Level, Question, TopicId } from './types';
 import { Rng } from './rng';
 import { generate } from './generators';
 import { validateQuestion } from './validate';
 import { TOPICS } from './topics';
+import { checkPart } from './answers';
+import { familyRound, placeQuestion, type PlaceType } from './generators/place';
 
 export interface TopicStats { seen: number; firstTry: number; wrong: number }
 export type Stats = Partial<Record<TopicId, TopicStats>>;
@@ -24,7 +26,37 @@ export function freshQuestion(rng: Rng, topic: TopicId, level: Level, avoid: Set
 
 export function buildTopicRound(rng: Rng, topic: TopicId, recent: string[]): Question[] {
   const avoid = new Set(recent);
-  return CONFIG.topicRoundLevels.map((lv) => freshQuestion(rng, topic, lv, avoid));
+  if (topic === 'placeValue' || topic === 'digitValue') {
+    // one round = two numbers, each met in several forms
+    let best: Question[] = [];
+    for (let i = 0; i < 20; i++) {
+      const qs = familyRound(rng, topic);
+      if (qs.some((q) => validateQuestion(q).length)) continue;
+      best = qs;
+      if (!qs.some((q) => avoid.has(q.sig))) break;
+    }
+    return spreadChoiceAnswers(rng, best);
+  }
+  return spreadChoiceAnswers(rng, CONFIG.topicRoundLevels.map((lv) => freshQuestion(rng, topic, lv, avoid)));
+}
+
+/** The correct button should not sit in the same position in two choice questions in a row. */
+export function spreadChoiceAnswers(rng: Rng, qs: Question[]): Question[] {
+  let last = '';
+  for (const q of qs) {
+    for (const p of q.parts) {
+      if (p.kind !== 'choice' || !p.choices || p.choices.some((c) => !c.isFigure && /^(אלפים|מאות|עשרות|יחידות|זוגי|אי־זוגי|חדה|ישרה|קהה|שטוחה|שווה־צלעות|שווה־שוקיים|שונה־צלעות|משולש|מרובע|מחומש|משושה|משובע|מתומן)$/.test(c.text))) continue; // fixed-order name lists stay in order
+      for (let k = 0; k < 6 && p.answer === last; k++) {
+        const cs: Choice[] = p.choices;
+        const correctText = cs.find((c) => c.id === p.answer)!.text;
+        const next: Choice[] = rng.shuffle(cs).map((c, i) => ({ ...c, id: 'abcdefgh'[i] }));
+        p.choices = next;
+        p.answer = next.find((c) => c.text === correctText)!.id;
+      }
+      last = p.answer;
+    }
+  }
+  return qs;
 }
 
 /** error rate 0..1 (unseen topics count as slightly weak so they get practiced too) */
@@ -63,9 +95,9 @@ export function buildMixed(rng: Rng, stats: Stats, recent: string[]): Question[]
 }
 
 /** Exam plan: every teacher item at least once; central items twice. */
-export const EXAM_PLAN: [TopicId, Level][] = [
-  ['placeValue', 1], ['placeValue', 3],
-  ['digitValue', 1], ['digitValue', 3],
+export const EXAM_PLAN: [TopicId, Level, PlaceType?][] = [
+  ['placeValue', 1, 'fields'], ['placeValue', 3, 'composeWords'],
+  ['digitValue', 1, 'placeText'], ['digitValue', 2, 'valueText'], ['digitValue', 3, 'digitAtPlace'],
   ['prevNext', 2], ['prevNext', 3],
   ['evenOdd', 2],
   ['multDiv', 2], ['multDiv', 3],
@@ -81,13 +113,14 @@ export const EXAM_PLAN: [TopicId, Level][] = [
 
 export function buildExam(rng: Rng, recent: string[]): Question[] {
   const avoid = new Set(recent);
-  return EXAM_PLAN.map(([t, lv]) => freshQuestion(rng, t, lv, avoid));
+  return spreadChoiceAnswers(rng, EXAM_PLAN.map(([t, lv, type]) => {
+    if (!type) return freshQuestion(rng, t, lv, avoid);
+    const q = placeQuestion(rng, t, lv, type);
+    avoid.add(q.sig);
+    return q;
+  }));
 }
 
 export function isCorrectAnswer(q: Question, partIdx: number, given: string | undefined): boolean {
-  const p = q.parts[partIdx];
-  if (given === undefined || given === '') return false;
-  if (p.kind === 'choice') return given === p.answer;
-  const clean = given.replace(/[\s,.'’]/g, '').replace(/^0+(?=\d)/, '');
-  return /^\d+$/.test(clean) && Number(clean) === Number(p.answer);
+  return checkPart(q.parts[partIdx], given).ok;
 }

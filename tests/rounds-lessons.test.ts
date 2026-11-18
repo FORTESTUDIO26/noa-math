@@ -5,6 +5,7 @@ import { buildExam, buildMixed, buildTopicRound, isCorrectAnswer, EXAM_PLAN } fr
 import { buildLessons } from '../src/lessons';
 import { validateQuestion } from '../src/validate';
 import { CONFIG } from '../src/config';
+import { checkPart } from '../src/answers';
 
 describe('rounds', () => {
   it('topic round: 5–7 questions of one topic, easy → harder, no repeats', () => {
@@ -92,6 +93,7 @@ describe('"איך עושים את זה?" cards', () => {
     expect(L.multDiv.skills.map((s) => s.title)).toEqual(['כפל', 'חילוק']);
     expect(L.prevNext.skills.map((s) => s.title)).toEqual(['המספר העוקב', 'המספר הקודם']);
     expect(L.placeValue.skills.length).toBe(2);
+    expect(L.digitValue.skills.length).toBe(2);
     expect(L.missing.skills.length).toBe(2);
     // each try-it checks the same skill it demonstrates
     expect(L.multDiv.skills[0].tryIt.math).toContain('×');
@@ -108,12 +110,27 @@ describe('"איך עושים את זה?" cards', () => {
     }
   });
 
-  it('the digit-value card matches the requested example', () => {
-    const s = L.digitValue.skills[0];
-    expect(s.example.task).toContain('352');
-    expect(s.example.figure).toContain('pv-hi');
-    expect(s.tryIt.prompt).toContain('473');
-    expect(s.tryIt.parts[0].answer).toBe('70');
-    expect(s.tryIt.parts[0].hint).toBe('התחילי מימין. הספרה הראשונה היא ספרת היחידות. באיזה מקום נמצאת הספרה 7?');
+  it('digit-value card: place vs value on the same number 7639, then "עכשיו תורך"', () => {
+    const [place, value] = L.digitValue.skills;
+    expect(place.example.task).toContain('7639');
+    expect(place.example.answer).toContain('עשרות');
+    expect(value.example.task).toContain('7639');
+    expect(value.example.answer).toContain('30');
+    expect(value.example.figure).toContain('data-act="bay"'); // clickable cargo bay
+    expect(place.tryIt.parts[0].kind).toBe('text');
+    expect(value.tryIt.prompt).toContain('473');
+    expect(checkPart(value.tryIt.parts[0], 'שבעים').ok).toBe(true);
+    expect(checkPart(value.tryIt.parts[0], '7 עשרות').ok).toBe(true);
+    expect(checkPart(value.tryIt.parts[0], 'עשרות').trap).toBe('מצאת את המקום. כמה הן 7 עשרות?');
+    expect(value.tryIt.parts[0].hint).toBe('התחילי מימין. הספרה הראשונה היא ספרת היחידות. באיזה מקום נמצאת הספרה 7?');
+  });
+
+  it('place-value card: 4-box decomposition of 7639 with clickable bays, try-it 7052 with a 0', () => {
+    const s = L.placeValue.skills[0];
+    expect(s.example.task).toContain('7639');
+    expect(s.example.figure).toContain('data-act="bay"');
+    expect(s.example.answer).toContain('7,000 + 600 + 30 + 9');
+    expect(s.tryIt.parts[0].kind).toBe('fields');
+    expect(s.tryIt.parts[0].answer).toBe('7|0|5|2');
   });
 });

@@ -1,4 +1,5 @@
 import type { Question } from './types';
+import { checkPart } from './answers';
 
 /** Returns a list of problems. Empty list = question is safe to show. */
 export function validateQuestion(q: Question): string[] {
@@ -20,6 +21,16 @@ export function validateQuestion(q: Question): string[] {
     if (!p.hint) errs.push('missing hint');
     if (p.kind === 'number') {
       if (!/^\d+$/.test(p.answer)) errs.push('number answer not a non-negative integer: ' + p.answer);
+    } else if (p.kind === 'text') {
+      if (!p.accept?.length) errs.push('text part without accepted answers');
+      if (!checkPart(p, p.answer).ok) errs.push('text display answer is not accepted: ' + p.answer);
+      if (!p.fieldHint) errs.push('text part without field instruction');
+    } else if (p.kind === 'fields') {
+      const fs = p.fields ?? [];
+      if (fs.length < 2) errs.push('fields part needs 2+ boxes');
+      if (fs.some((f) => !/^\d+$/.test(f.answer) || !f.label)) errs.push('bad field');
+      if (!checkPart(p, fs.map((f) => f.answer).join('|')).ok) errs.push('fields answer not accepted');
+      if (fs.some((f) => f.answer === '0') && !p.zeroHint) errs.push('zero field without zeroHint');
     } else {
       const cs = p.choices ?? [];
       if (cs.length < 2) errs.push('fewer than 2 choices');

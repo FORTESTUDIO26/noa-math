@@ -230,3 +230,139 @@ b { font-weight: 700; }
 @media (prefers-reduced-motion: no-preference) {
   .bar span { transition: width .25s ease; }
 }
+
+/* ================================================================ space station theme */
+:root {
+  --space: #1d2b53;
+  --space-2: #2d3f73;
+  --steel: #dfe6f3;
+  --steel-2: #c4d0e6;
+  --cargo: #ff9f1c;
+  --cargo-soft: #fff1dc;
+  --teal: #12a594;
+}
+body {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(circle at 12% 8%, #d9d2ff 0 1.5px, transparent 2px),
+    radial-gradient(circle at 78% 22%, #d9d2ff 0 1.2px, transparent 2px),
+    radial-gradient(circle at 40% 60%, #e2dcff 0 1px, transparent 1.8px);
+  background-size: 160px 160px, 210px 210px, 130px 130px;
+}
+
+/* Robi */
+.robot { flex-shrink: 0; overflow: visible; }
+.rb-head { fill: var(--steel); stroke: var(--space); stroke-width: 2.5; }
+.rb-face { fill: var(--space); }
+.rb-eye { fill: #7cf3e4; }
+.rb-line { fill: none; stroke: var(--space); stroke-width: 2.5; stroke-linecap: round; }
+.rb-face + .rb-eye, .robot .rb-face ~ path.rb-line { stroke: #7cf3e4; }
+.rb-bulb { fill: var(--cargo); stroke: var(--space); stroke-width: 1.5; }
+.rb-body { fill: var(--steel-2); stroke: var(--space); stroke-width: 2.5; }
+.rb-light { fill: var(--teal); }
+.rb-limb { stroke: var(--space); stroke-width: 3.5; stroke-linecap: round; }
+.rb-hand { fill: var(--steel); stroke: var(--space); stroke-width: 2; }
+.rb-bubble { fill: #fff; stroke: var(--space); stroke-width: 1.5; }
+.rb-beam { fill: #7cf3e4; opacity: .45; }
+.rb-arm { transform-origin: 46px 46px; }
+@media (prefers-reduced-motion: no-preference) {
+  .robot-wave .rb-arm { animation: rb-wave .5s ease-in-out 0s 4 alternate; }
+  .good .robot { animation: rb-hop .45s ease-out 1; }
+}
+@keyframes rb-wave { from { transform: rotate(-18deg); } to { transform: rotate(22deg); } }
+@keyframes rb-hop { 0% { transform: translateY(0); } 40% { transform: translateY(-6px); } 100% { transform: translateY(0); } }
+
+.hello { display: flex; align-items: center; gap: 10px; margin: 18px 0 6px; }
+.hello .app-title { margin: 0; text-align: start; font-size: 1.55rem; }
+.hello-text { margin: 2px 0 0; color: var(--muted); font-size: .98rem; }
+.home .sub { text-align: start; margin: 4px 0 16px; }
+
+.good { display: flex; align-items: center; gap: 8px; }
+.hint { display: flex; align-items: flex-start; gap: 8px; }
+.hint > div, .explain > div { min-width: 0; }
+.explain { display: flex; align-items: flex-start; gap: 8px; }
+
+/* text / number answer boxes */
+.answer-box { flex: 1 1 160px; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.num-form-row { display: flex; align-items: center; gap: 8px; }
+.text-input { font-size: 1.3rem; text-align: center; }
+.field-hint { font-size: .86rem; color: var(--muted); }
+.after { margin-top: 10px; padding: 8px 12px; border-radius: 12px; background: var(--cargo-soft); border: 2px solid #ffd59a; }
+
+/* decomposition boxes – like the notebook: [ box ] label */
+.fields-form { display: flex; flex-direction: column; gap: 10px; }
+.frows { display: flex; flex-direction: column; gap: 8px; }
+.frow { display: flex; align-items: center; gap: 10px; padding: 4px 6px; border-radius: 12px; border: 2px solid transparent; flex-wrap: wrap; }
+.frow-bad { border: 2px dashed var(--bad); background: var(--bad-bg); }
+.field-input { flex: 0 0 64px; width: 64px; min-height: 52px; font-size: 1.5rem; padding: 4px; }
+.flabel { font-weight: 700; font-size: 1.12rem; min-width: 3.6em; }
+.fmark { font-weight: 800; font-size: .9rem; }
+.fmark-bad { color: var(--bad); }
+.fmark-ok { color: var(--good); }
+.field-input[readonly] { background: #f6f8fc; }
+
+/* notebook rows in the worked example */
+.nb-rows { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+.nb-box { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 40px; border: 2px solid var(--space); border-radius: 8px; font-weight: 800; font-size: 1.2rem; background: #fff; }
+.nb-val { color: var(--muted); }
+
+/* cargo bays */
+.cargo { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.ship { position: relative; background: var(--space); border-radius: 26px 26px 14px 14px; padding: 12px 10px 10px; box-shadow: inset 0 -4px 0 var(--space-2); max-width: 100%; }
+.ship::before { content: ""; position: absolute; top: -9px; left: 50%; width: 34px; height: 14px; margin-left: -17px; border-radius: 18px 18px 0 0; background: var(--space-2); }
+.bays { display: flex; gap: 6px; direction: ltr; unicode-bidi: isolate; }
+.bay { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-width: 60px; padding: 8px 4px 6px; border-radius: 12px; border: 3px solid var(--steel-2); background: var(--steel); color: var(--space); font: inherit; }
+button.bay { cursor: pointer; }
+.bay-door { width: 70%; height: 6px; border-radius: 3px; background: repeating-linear-gradient(90deg, var(--cargo) 0 6px, var(--space) 6px 10px); margin-bottom: 4px; }
+.bay-digit { font-size: 1.7rem; font-weight: 800; line-height: 1.1; }
+.bay-name { font-size: .82rem; font-weight: 700; direction: rtl; }
+.bay-hi { border: 3px dashed var(--cargo); background: var(--cargo-soft); }
+.bay-hi .bay-name { text-decoration: underline; text-underline-offset: 3px; }
+.bay-arrow { color: var(--cargo); line-height: 1; font-size: .9rem; }
+.bay-open { box-shadow: 0 0 0 3px #7cf3e4; }
+button.bay:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.bay-packs { width: 100%; text-align: center; }
+.packs-prompt { font-weight: 700; color: var(--space-2); }
+.packs-prompt::before { content: "👆 "; }
+.pk-row { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-end; gap: 4px; direction: ltr; }
+.pk { display: block; }
+.pk-1 { width: 16px; height: 16px; }
+.pk-10 { width: 12px; height: 88px; }
+.pk-100 { width: 46px; height: 46px; }
+.pk-1000 { width: 46px; height: 46px; }
+.pk-cube { fill: var(--cargo); stroke: var(--space); stroke-width: 1.2; }
+.pk-grid { stroke: var(--space); stroke-width: .6; }
+.pk-top { fill: #ffc46b; stroke: var(--space); stroke-width: 1.2; }
+.pk-side { fill: #e08700; stroke: var(--space); stroke-width: 1.2; }
+.pk-label { font-size: 12px; font-weight: 800; text-anchor: middle; fill: var(--space); }
+.packs-caption { margin-top: 6px; font-weight: 700; }
+
+.hint-figure { margin-top: 12px; padding: 10px; border-radius: 14px; background: #f4f6fd; border: 2px solid var(--steel-2); }
+.hint-figure-label { font-weight: 700; color: var(--space-2); margin-bottom: 6px; font-size: .92rem; }
+.hint-figure .q-figure, .hint-figure .cargo { margin: 0; }
+
+/* geometry: parts for the spaceship */
+.tray { border: 2px solid var(--steel-2); border-radius: 16px; background: linear-gradient(#f4f7fd, #e9eef8); padding: 8px; margin: 6px 0 12px; }
+.tray-empty { padding: 4px 8px; }
+.tray-label { display: flex; align-items: center; gap: 6px; font-size: .88rem; font-weight: 700; color: var(--space-2); }
+.tray .q-figure { margin: 4px 0 2px; }
+.shape { fill: var(--steel); stroke: var(--space); }
+.vertex { fill: var(--space); }
+.choices-fig .choice { background: linear-gradient(#fbfcff, #eef2fa); }
+
+/* number line = space track with stations */
+.nl-rail { stroke: var(--steel-2); stroke-width: 10; stroke-linecap: round; }
+.nl-line { stroke: var(--space); stroke-width: 2.5; }
+.nl-station { fill: #fff; stroke: var(--space); stroke-width: 2.5; }
+.nl-station-q { fill: var(--cargo-soft); stroke: var(--accent); stroke-width: 3; }
+.nl-tick, .nl-tick-q { stroke: transparent; }
+.nl-station { fill: #fff; stroke: var(--space); stroke-width: 3; }
+
+/* robots in multiplication groups */
+.ir-head { fill: var(--steel); stroke: var(--space); stroke-width: 1.4; }
+.ir-body { fill: var(--steel-2); stroke: var(--space); stroke-width: 1.2; }
+.ir-eye { fill: var(--accent); }
+.ir-ant { stroke: var(--space); stroke-width: 1.4; }
+.grp { fill: #eef1fb; stroke: var(--space-2); }
+
+.q-figure { flex-direction: column; align-items: center; gap: 8px; }
