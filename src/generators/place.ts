@@ -37,23 +37,23 @@ const valuesSum = (n: number) => PLACES.map((p) => digitsOf(n)[p] * 10 ** p).fil
 
 /* ------------------------------------------------------------- the question types */
 
-/** "פרקי את המספר 7639" – four boxes: [ ] אלפים / [ ] מאות / [ ] עשרות / [ ] יחידות */
+/** "מפרקים את המספר 7639" – four boxes: [ ] אלפים / [ ] מאות / [ ] עשרות / [ ] יחידות */
 export function qFields(topic: TopicId, level: Level, n: number): Question {
   const ds = digitsOf(n);
   const zeroP = PLACES.find((p) => ds[p] === 0);
   const fields = PLACES.map((p) => ({ label: placeName(p), answer: String(ds[p]) }));
   const part: Part = {
     kind: 'fields', fields, answer: fields.map((f) => f.answer).join('|'),
-    hint: 'בדקי את השורות המסומנות. קראי את המספר משמאל: הספרה הראשונה היא האלפים, והאחרונה (הימנית) היא היחידות.',
+    hint: 'בודקים את השורות המסומנות. קוראים את המספר משמאל: הספרה הראשונה היא האלפים, והאחרונה (הימנית) היא היחידות.',
     zeroHint: zeroP !== undefined
       ? `ב־${fmt(n)} אין ${placeName(zeroP)}, אבל צריך לכתוב 0 בשורת ה${placeName(zeroP)}. ה־0 שומר על המקום, כדי שכל ספרה תישאר במקום שלה.`
       : undefined,
-    fieldHint: 'כתבי ספרה אחת בכל שורה',
+    fieldHint: 'כותבים ספרה אחת בכל שורה',
     after: `הפירוק לפי ערכים: ${m(`${fmt(n)} = ${valuesSum(n)}`)}`,
   };
   return {
     topic, level, sig: `pv-fields-${n}`,
-    prompt: `פרקי את המספר <b>${fmt(n)}</b>.`,
+    prompt: `יש לפרק את המספר <b>${fmt(n)}</b>.`,
     parts: [part],
     hintFigure: cargoBays(n, { minPlaces: 4 }),
     explanation: `${PLACES.map((p) => `${countWord(ds[p], p)}`).join(', ')}. ${zeroP !== undefined ? `בשורת ה${placeName(zeroP)} כותבים 0. ` : ''}לפי ערכים: ${m(`${fmt(n)} = ${valuesSum(n)}`)}.`,
@@ -71,7 +71,7 @@ export function qPlaceChoice(topic: TopicId, level: Level, n: number, p: number)
     prompt: `באיזה מקום נמצאת הספרה <b>${d}</b> במספר <b>${fmt(n)}</b>?`,
     parts: [{
       kind: 'choice', choices, answer, fixedOrder,
-      hint: `התחילי מימין: הספרה הימנית היא היחידות, אחריה עשרות, מאות ואלפים. ספרי מקומות עד שתגיעי ל־${d}.`,
+      hint: `מתחילים מימין: הספרה הימנית היא היחידות, אחריה עשרות, מאות ואלפים. סופרים מקומות עד שמגיעים ל־${d}.`,
     }],
     hintFigure: cargoBays(n, { highlight: p }),
     explanation: `במספר ${m(fmt(n))}: ${order.map((q) => `${placeName(q)} – ${ds[q]}`).join(', ')}. הספרה ${d} נמצאת במקום ה<b>${placeName(p)}</b>.`,
@@ -90,10 +90,10 @@ export function qValueChoice(topic: TopicId, level: Level, n: number, p: number,
     prompt: `מה הערך של הספרה <b>${d}</b> במספר <b>${fmt(n)}</b>?`,
     parts: [{
       kind: 'choice', choices, answer, fixedOrder,
-      hint: `קודם מצאי באיזה מקום נמצאת הספרה ${d}. אחר כך חשבי: כמה הן ${d} חבילות מהסוג של המקום הזה?`,
+      hint: `קודם מוצאים באיזה מקום נמצאת הספרה ${d}. אחר כך חושבים: כמה הן ${d} חבילות מהסוג של המקום הזה?`,
       traps: [
         ...(p !== 0 ? [{ match: [fmt(d)], hint: `${d} היא הספרה עצמה. היא נמצאת במקום ה${placeName(p)}, ושם היא שווה יותר. כמה הן ${d} ${placeName(p)}?` }] : []),
-        ...places.filter((q) => q !== p && !(q === 0 && p !== 0)).map((q) => ({ match: [fmt(d * 10 ** q)], hint: `${fmt(d * 10 ** q)} זה ${countWord(d, q)}. בדקי שוב: באיזה מקום נמצאת הספרה ${d}?` })),
+        ...places.filter((q) => q !== p && !(q === 0 && p !== 0)).map((q) => ({ match: [fmt(d * 10 ** q)], hint: `${fmt(d * 10 ** q)} זה ${countWord(d, q)}. בודקים שוב: באיזה מקום נמצאת הספרה ${d}?` })),
       ],
     }],
     hintFigure: cargoBays(n, { highlight: p, open: p }),
@@ -111,13 +111,13 @@ export function qDigitAtPlace(rng: Rng, topic: TopicId, level: Level, n: number,
   return {
     topic, level, sig: `dv-digitAt-${n}-${p}`,
     prompt: `איזו ספרה נמצאת במקום ה<b>${placeName(p)}</b> במספר <b>${fmt(n)}</b>?`,
-    parts: [{ kind: 'choice', choices, answer, hint: `התחילי מהספרה הימנית (יחידות) וספרי שמאלה: יחידות, עשרות, מאות, אלפים – עד ה${placeName(p)}.` }],
+    parts: [{ kind: 'choice', choices, answer, hint: `מתחילים מהספרה הימנית (יחידות) וסופרים שמאלה: יחידות, עשרות, מאות, אלפים – עד ה${placeName(p)}.` }],
     hintFigure: cargoBays(n, { highlight: p, minPlaces: 4 }),
     explanation: `במספר ${m(fmt(n))} במקום ה${placeName(p)} נמצאת הספרה <b>${correct}</b>.`,
   };
 }
 
-/** "כתבי את המספר: 7 אלפים, 6 מאות, 3 עשרות ו־9 יחידות" */
+/** "כותבים את המספר: 7 אלפים, 6 מאות, 3 עשרות ו־9 יחידות" */
 export function qComposeWords(rng: Rng, topic: TopicId, level: Level, n: number, shuffled: boolean): Question {
   const ds = digitsOf(n);
   const nonzero = PLACES.filter((p) => ds[p] !== 0);
@@ -127,8 +127,8 @@ export function qComposeWords(rng: Rng, topic: TopicId, level: Level, n: number,
   const zeroP = PLACES.find((p) => ds[p] === 0);
   return {
     topic, level, sig: `pv-words-${n}-${shuffled ? 's' : 'o'}`,
-    prompt: `${shuffled ? 'שימי לב – הסדר מבולבל. ' : ''}כתבי את המספר: <b>${text}</b>.`,
-    parts: [{ kind: 'number', answer: String(n), hint: zeroP !== undefined ? `אין ${placeName(zeroP)} במספר. מה כותבים במקום ה${placeName(zeroP)}?` : 'כתבי ספרה לכל מקום לפי הסדר: אלפים, מאות, עשרות, יחידות.' }],
+    prompt: `${shuffled ? 'שימו לב – הסדר מבולבל. ' : ''}כותבים את המספר: <b>${text}</b>.`,
+    parts: [{ kind: 'number', answer: String(n), hint: zeroP !== undefined ? `אין ${placeName(zeroP)} במספר. מה כותבים במקום ה${placeName(zeroP)}?` : 'כותבים ספרה לכל מקום לפי הסדר: אלפים, מאות, עשרות, יחידות.' }],
     hintFigure: cargoBays(n, { minPlaces: 4 }),
     explanation: `מסדרים: אלפים ${ds[3]}, מאות ${ds[2]}, עשרות ${ds[1]}, יחידות ${ds[0]}${zeroP !== undefined ? ` (במקום ה${placeName(zeroP)} כותבים 0)` : ''}. המספר: ${m(fmt(n))}.`,
   };
@@ -139,9 +139,9 @@ export function qComposeSum(topic: TopicId, level: Level, n: number): Question {
   const ds = digitsOf(n);
   return {
     topic, level, sig: `pv-sum-${n}`,
-    prompt: 'הרכיבי את המספר. כתבי את התוצאה.',
+    prompt: 'יש להרכיב את המספר ולכתוב את התוצאה.',
     math: `${valuesSum(n)} = ${BLANK}`,
-    parts: [{ kind: 'number', answer: String(n), hint: 'כל מחובר מתאים למקום אחר: אלפים, מאות, עשרות ויחידות. כתבי ספרה אחת לכל מקום – ו־0 במקום שחסר.' }],
+    parts: [{ kind: 'number', answer: String(n), hint: 'כל מחובר מתאים למקום אחר: אלפים, מאות, עשרות ויחידות. כותבים ספרה אחת לכל מקום – ו־0 במקום שחסר.' }],
     hintFigure: cargoBays(n, { minPlaces: 4 }),
     explanation: `${PLACES.map((p) => countWord(ds[p], p)).join(', ')}. המספר: ${m(fmt(n))}.`,
   };
@@ -155,7 +155,7 @@ export function qDecompMissing(rng: Rng, topic: TopicId, level: Level, n: number
   const terms = PLACES.filter((p) => ds[p] !== 0).map((p) => (p === missP ? BLANK : fmt(ds[p] * 10 ** p)));
   return {
     topic, level, sig: `pv-miss-${n}-${missP}`,
-    prompt: 'השלימי את הפירוק.',
+    prompt: 'יש להשלים את הפירוק.',
     math: `${fmt(n)} = ${terms.join(' + ')}`,
     parts: [{ kind: 'number', answer: String(ds[missP] * 10 ** missP), hint: `באיזה מקום נמצאת הספרה ${ds[missP]} במספר ${fmt(n)}? כמה היא שווה?` }],
     hintFigure: cargoBays(n, { highlight: missP, open: missP, minPlaces: 4 }),
@@ -182,7 +182,7 @@ export function qChooseDecomp(rng: Rng, topic: TopicId, level: Level, n: number)
   return {
     topic, level, sig: `pv-choose-${n}`,
     prompt: `איזה פירוק מתאים למספר <b>${fmt(n)}</b>?`,
-    parts: [{ kind: 'choice', choices, answer, hint: 'בדקי כל ספרה: באיזה מקום היא נמצאת? אפס לא כותבים בפירוק.' }],
+    parts: [{ kind: 'choice', choices, answer, hint: 'בודקים כל ספרה: באיזה מקום היא נמצאת? אפס לא כותבים בפירוק.' }],
     hintFigure: cargoBays(n, { minPlaces: 4 }),
     explanation: `${nonzero.map((p) => `${ds[p]} ב${placeName(p)} = ${m(fmt(ds[p] * 10 ** p))}`).join('; ')}. לכן ${m(`${fmt(n)} = ${correct}`)}.`,
   };
@@ -193,8 +193,8 @@ export function qValueNumber(topic: TopicId, level: Level, n: number, p: number)
   const d = digitsOf(n)[p];
   return {
     topic, level, sig: `dv-val-${n}-${p}`,
-    prompt: `מה הערך של הספרה <b>${d}</b> במספר <b>${fmt(n)}</b>? כתבי במספר.`,
-    parts: [{ kind: 'number', answer: String(d * 10 ** p), hint: `התחילי מימין: יחידות, עשרות, מאות, אלפים. באיזה מקום נמצאת הספרה ${d}?`, traps: [{ match: [String(d)], hint: `${d} היא הספרה. כמה היא שווה במקום ה${placeName(p)}?` }] }],
+    prompt: `מה הערך של הספרה <b>${d}</b> במספר <b>${fmt(n)}</b>? כותבים במספר.`,
+    parts: [{ kind: 'number', answer: String(d * 10 ** p), hint: `מתחילים מימין: יחידות, עשרות, מאות, אלפים. באיזה מקום נמצאת הספרה ${d}?`, traps: [{ match: [String(d)], hint: `${d} היא הספרה. כמה היא שווה במקום ה${placeName(p)}?` }] }],
     hintFigure: cargoBays(n, { highlight: p, open: p, minPlaces: 4 }),
     explanation: `הספרה ${d} נמצאת במקום ה${placeName(p)}. ${countWord(d, p)} הן ${m(fmt(d * 10 ** p))}.`,
   };
@@ -218,7 +218,7 @@ export function qWhichNumber(rng: Rng, topic: TopicId, level: Level): Question {
   return {
     topic, level, sig: `dv-which-${d}-${tp}-${correct}`,
     prompt: `באיזה מספר הספרה ${d} שווה <b>${fmt(val)}</b>?`,
-    parts: [{ kind: 'choice', choices, answer, hint: `${fmt(val)} זה ${countWord(d, tp)}. חפשי מספר שבו ${d} נמצאת במקום ה${placeName(tp)}.` }],
+    parts: [{ kind: 'choice', choices, answer, hint: `${fmt(val)} זה ${countWord(d, tp)}. מחפשים מספר שבו ${d} נמצאת במקום ה${placeName(tp)}.` }],
     explanation: `${m(fmt(val))} = ${countWord(d, tp)}. רק במספר ${m(fmt(correct))} הספרה ${d} נמצאת במקום ה${placeName(tp)}.`,
   };
 }

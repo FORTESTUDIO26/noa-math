@@ -1,5 +1,5 @@
 /* Layout: one calm column, the question in the middle, art kept small and purposeful. */
-:root {
+:root, [data-th="club"] {
   --cream: #fff7ee;      /* page background */
   --paper: #fffdfa;      /* surfaces */
   --sand: #f8ebdd;       /* soft panels */
@@ -490,3 +490,107 @@ h1, h2, .app-title, .lesson-title, .skill-title, .big-score, .group-title, .top-
 .side-badge { stroke: var(--berry); }
 .seq-blank { border-color: var(--err); color: var(--err); background: var(--pink-soft); }
 .seq-step { color: var(--berry-dark); }
+
+/* ================================================================== two looks */
+:root:not([data-theme="space"]) .th-space, :root[data-theme="space"] .th-club { display: none !important; }
+.duo { display: inline-flex; flex-shrink: 0; }
+
+/* "כדורגל בחלל": night blue, light blue and pitch green, with bright reading areas */
+:root[data-theme="space"], [data-th="space"] {
+  --cream: #eaf3fb;
+  --paper: #ffffff;
+  --sand: #dce9f6;
+  --line: #c3d6ea;
+  --ink: #0f1d3d;
+  --ink-2: #3c4d70;
+  --berry: #1b3a7a;      /* night-blue action buttons */
+  --berry-dark: #0f2554;
+  --pink: #8fd0f5;       /* light blue accent */
+  --pink-soft: #e1f2fd;
+  --pista: #4cb860;      /* pitch green */
+  --pista-dark: #1e6b31;
+  --pista-soft: #e1f4e4;
+  --sky: #8fd0f5;
+  --sky-dark: #1b3a7a;
+  --sky-soft: #e5f3fc;
+  --butter: #ffe066;
+}
+:root[data-theme="space"] body { background-image: radial-gradient(circle at 20% 12%, #c9dcf0 0 1.3px, transparent 2px), radial-gradient(circle at 70% 40%, #c9dcf0 0 1px, transparent 1.8px); background-size: 170px 170px, 230px 230px; }
+:root[data-theme="space"] .q-figure-part::before, :root[data-theme="space"] .choices-fig .choice::before { display: none; }
+:root[data-theme="space"] .q-figure-part { background: var(--pista-soft); border: 2px dashed var(--pista); }
+:root[data-theme="space"] .chest { background: var(--berry); }
+:root[data-theme="space"] .bay-name { background: var(--sky-soft); }
+:root[data-theme="space"] .bay-knob { background: var(--pista); }
+:root[data-theme="space"] .grp { fill: var(--pista-soft); stroke: var(--pista-dark); }
+:root[data-theme="space"] .pk-cube { fill: var(--sky); }
+:root[data-theme="space"] .pk-top { fill: #c6e8fb; }
+:root[data-theme="space"] .pk-side { fill: #5aa9d6; }
+:root[data-theme="space"] .shape { fill: var(--sky-soft); }
+
+/* astronauts */
+.astro { flex-shrink: 0; overflow: visible; }
+.as-helmet { fill: #f4f8ff; stroke: var(--ink); stroke-width: 2.4; }
+.as-visor { fill: #fff1e6; stroke: var(--ink); stroke-width: 1.8; }
+.as-glare { fill: none; stroke: #fff; stroke-width: 3; stroke-linecap: round; opacity: .9; }
+.as-ant { stroke: var(--ink); stroke-width: 2; }
+.as-ant-tip { fill: #ffe066; stroke: var(--ink); stroke-width: 1.4; }
+.as-suit { fill: #f4f8ff; stroke: var(--ink); stroke-width: 2.2; }
+.as-kit { fill: #4cb860; stroke: var(--ink); stroke-width: 1.8; }
+.as-kit-stripe { stroke: #8fd0f5; stroke-width: 3; }
+.as-num { font: 700 9px var(--font); fill: #fff; text-anchor: middle; }
+.as-band { fill: #ffe066; stroke: var(--ink); stroke-width: 1; }
+.as-band-c { font: 700 6px var(--font); fill: var(--ink); text-anchor: middle; }
+.as-boot { fill: #1b3a7a; }
+.as-hand { fill: #f4f8ff; stroke: var(--ink); stroke-width: 1.8; }
+.as-glove { fill: #ff9a3c; stroke: var(--ink); stroke-width: 1.8; }
+.as-arm { fill: none; stroke: #f4f8ff; stroke-width: 9; stroke-linecap: round; }
+.as-pony { fill: #b5653a; stroke: var(--ink); stroke-width: 1.6; }
+.as-cap { fill: none; stroke: #1b3a7a; stroke-width: 3; stroke-linecap: round; }
+.as-ball { fill: #fff; stroke: var(--ink); stroke-width: 1.6; }
+.as-ball-patch { fill: var(--ink); }
+.as-trail { fill: none; stroke: #ffe066; stroke-width: 2.4; stroke-linecap: round; stroke-dasharray: 1 4; }
+.net { fill: #e1f4e4; stroke: #1e6b31; stroke-width: 2; }
+.net-line { stroke: #1e6b31; stroke-width: 1; opacity: .6; }
+.nl-pitch { fill: #4cb860; }
+.nl-pitch-line { stroke: #fff; stroke-width: 1.5; stroke-dasharray: 6 5; }
+.nl-mark { stroke: #fff; stroke-width: 3; }
+.nl-disc { fill: #fff; stroke: var(--ink); stroke-width: 2; }
+.nl-disc.nl-station-q { fill: #ffe066; stroke: var(--err); stroke-width: 2.6; }
+
+/* space home scene */
+.ss-sky { fill: #13234a; }
+.ss-star { fill: #fff; }
+.ss-star-y { fill: #ffe066; }
+.ss-earth { fill: #5aa9d6; stroke: #fff; stroke-width: 2; }
+.ss-land { fill: #4cb860; }
+.ss-moon { fill: #dfe3ec; }
+.ss-crater { fill: #c6ccd9; }
+.ss-pitch { fill: #4cb860; }
+.ss-lines { fill: none; stroke: #fff; stroke-width: 2; }
+.ss-goal { fill: none; stroke: #fff; stroke-width: 3; stroke-linejoin: round; }
+.ss-trail { fill: #ffe066; stroke: #13234a; stroke-width: .6; }
+
+/* home: greeting + settings link */
+.greet { margin: 2px 0 0; font-family: var(--round); font-size: 1.15rem; color: var(--berry-dark); }
+.settings-row { margin-top: 10px; text-align: center; }
+
+/* welcome screen */
+.welcome { padding-top: 18px; }
+.welcome .app-title { text-align: center; }
+.welcome .lead { text-align: center; margin-bottom: 14px; }
+.welcome-form { display: flex; flex-direction: column; gap: 10px; }
+.field-label { font-weight: 700; }
+.field-label small { font-weight: 400; color: var(--ink-2); }
+.name-input { min-height: 54px; font: 500 1.2rem var(--font); padding: 6px 14px; border: 3px solid var(--line); border-radius: 14px; background: #fff; color: var(--ink); }
+.name-input:focus { outline: none; border-color: var(--berry); }
+.theme-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.theme-opt { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 18px; border: 2px solid var(--line); background: var(--paper); cursor: pointer; text-align: center; color: var(--ink); }
+.theme-opt.on { border: 3px solid var(--berry); background: var(--pink-soft); }
+.theme-thumb { display: block; border-radius: 14px; overflow: hidden; }
+.theme-thumb .scene { margin: 0; }
+.theme-thumb .scene-svg { box-shadow: none; border-radius: 14px; }
+.theme-name { display: flex; flex-direction: column; }
+.theme-name b { font-family: var(--round); font-weight: 400; font-size: 1.05rem; }
+.theme-name small { color: var(--ink-2); font-size: .8rem; }
+.theme-mark { align-self: center; font-size: .8rem; font-weight: 700; padding: 1px 10px; border-radius: 99px; border: 2px solid var(--berry); color: var(--berry-dark); }
+.theme-opt.on .theme-mark { background: var(--berry); color: #fff; }

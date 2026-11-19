@@ -26,7 +26,7 @@ export function classifyAngle(deg: number): AngleType {
   return deg < 90 ? 'acute' : 'obtuse';
 }
 
-const angleHint = 'דמייני פינה של דף בקודקוד. האם הזווית צרה מהפינה, שווה לה בדיוק, או רחבה ממנה?';
+const angleHint = 'מדמיינים פינה של דף בקודקוד. האם הזווית צרה מהפינה, שווה לה בדיוק, או רחבה ממנה?';
 const angleRule = 'זווית חדה קטנה מזווית ישרה (פינה של דף), זווית ישרה שווה לה בדיוק, וזווית קהה גדולה ממנה' + (CONFIG.includeStraightAngle ? '. זווית שטוחה נראית כמו קו ישר.' : '.');
 
 function nameChoices(correct: AngleType) {
@@ -60,7 +60,7 @@ export function angles(rng: Rng, level: Level): Question {
     const { choices, answer } = makeChoices(rng, correct, figs.filter((f) => f !== correct));
     return {
       topic, level, sig: `an-pick-${t}-${figs.map((f) => f.text).join('')}`,
-      prompt: `בחרי את הזווית ה<b>${ANGLE_NAMES[t]}</b>.`,
+      prompt: `יש לבחור את הזווית ה<b>${ANGLE_NAMES[t]}</b>.`,
       parts: [{ kind: 'choice', choices, answer, hint: angleHint }],
       explanation: `${angleRule} לכן בחרנו את הזווית ה${ANGLE_NAMES[t]}.`,
     };
@@ -74,7 +74,7 @@ export function angles(rng: Rng, level: Level): Question {
     topic, level, sig: `an-tri-${t}-${deg}-${rot}`,
     prompt: 'איזו זווית מסומנת במשולש? (הזווית עם הסימון)',
     figure: angleFigure({ deg, rot, closed: true, len1: rng.int(80, 120), len2: rng.int(80, 120) }),
-    parts: [{ kind: 'choice', choices, answer, fixedOrder: true, hint: 'הסתכלי רק על הזווית המסומנת. ' + angleHint }],
+    parts: [{ kind: 'choice', choices, answer, fixedOrder: true, hint: 'מסתכלים רק על הזווית המסומנת. ' + angleHint }],
     explanation: `${angleRule} הזווית המסומנת היא <b>${ANGLE_NAMES[t]}</b>. סיבוב הצורה לא משנה את סוג הזווית.`,
   };
 }
@@ -89,7 +89,7 @@ const pname = (n: number) => CONFIG.polygonNames[n];
 export function polygons(rng: Rng, level: Level): Question {
   const topic = 'polygons' as const;
   const sides = polygonSides();
-  const countHint = 'סמני צלע אחת שממנה התחלת, וספרי את הצלעות סביב הצורה עד שתחזרי אליה.';
+  const countHint = 'מסמנים צלע אחת שממנה התחלת, וסופרים את הצלעות סביב הצורה עד שחוזרים אליה.';
   if (level === 1) {
     const n = rng.pick(sides);
     const pts = polygonPoints(rng, n, rng.bool(), rng.int(55, 100));
@@ -98,7 +98,7 @@ export function polygons(rng: Rng, level: Level): Question {
       topic, level, sig: `pg-count-${n}-${askVert}-${Math.round(pts[0].x)}`,
       prompt: askVert ? 'כמה קודקודים יש למצולע?' : 'כמה צלעות יש למצולע?',
       figure: polygonFigure(pts),
-      parts: [{ kind: 'number', answer: String(n), hint: askVert ? 'קודקוד הוא נקודה שבה נפגשות שתי צלעות. ספרי את הנקודות.' : countHint }],
+      parts: [{ kind: 'number', answer: String(n), hint: askVert ? 'קודקוד הוא נקודה שבה נפגשות שתי צלעות. סופרים את הנקודות.' : countHint }],
       explanation: `למצולע יש ${n} צלעות ו־${n} קודקודים. זה ${pname(n)}.`,
     };
   }
@@ -122,7 +122,7 @@ export function polygons(rng: Rng, level: Level): Question {
     return {
       topic, level, sig: `pg-not-${kind}-${polys.map((p) => p.text).join('')}`,
       prompt: 'איזו צורה <b>אינה</b> מצולע?',
-      parts: [{ kind: 'choice', choices, answer, hint: 'מצולע הוא צורה סגורה שכל הצלעות שלה ישרות. חפשי צורה שלא עומדת בזה.' }],
+      parts: [{ kind: 'choice', choices, answer, hint: 'מצולע הוא צורה סגורה שכל הצלעות שלה ישרות. מחפשים צורה שלא עומדת בזה.' }],
       explanation: `מצולע הוא צורה סגורה שכל הצלעות שלה קווים ישרים. ${why}, ולכן היא אינה מצולע.`,
     };
   }
@@ -133,8 +133,8 @@ export function polygons(rng: Rng, level: Level): Question {
   const { choices, answer } = makeChoices(rng, correct, figs.filter((f) => f !== correct));
   return {
     topic, level, sig: `pg-pick-${target}-${chosen.join('')}`,
-    prompt: `בחרי את ה<b>${pname(target)}</b>.`,
-    parts: [{ kind: 'choice', choices, answer, hint: `ל${pname(target)} יש ${target} צלעות. ספרי את הצלעות בכל צורה.` }],
+    prompt: `יש לבחור את ה<b>${pname(target)}</b>.`,
+    parts: [{ kind: 'choice', choices, answer, hint: `ל${pname(target)} יש ${target} צלעות. סופרים את הצלעות בכל צורה.` }],
     explanation: `ל${pname(target)} יש ${target} צלעות. רק בצורה שבחרנו יש בדיוק ${target} צלעות.`,
   };
 }
@@ -191,14 +191,14 @@ export function triangles(rng: Rng, level: Level): Question {
         topic, level, sig: `tr-fig-${t}-${s.join('')}`,
         prompt: 'איזה משולש זה? (אורכי הצלעות בס״מ. קו קטן על צלע מסמן צלעות שוות.)',
         figure: triangleFigure({ sides: s, rot: rng.int(0, 71) * 5, lengths: true, ticks: true }),
-        parts: [{ kind: 'choice', choices, answer, fixedOrder: true, hint: 'השווי את שלושת המספרים. כמה צלעות שוות יש?' }],
+        parts: [{ kind: 'choice', choices, answer, fixedOrder: true, hint: 'משווים את שלושת המספרים. כמה צלעות שוות יש?' }],
         explanation: `אורכי הצלעות: ${lens} ס״מ. ${triRule} לכן זה משולש <b>${TRI_NAMES[t]}</b>.${eqNote}`,
       };
     }
     return {
       topic, level, sig: `tr-txt-${t}-${s.join('')}`,
       prompt: `למשולש יש צלעות באורך <b>${s[2]} ס״מ, ${s[0]} ס״מ ו־${s[1]} ס״מ</b>. איזה משולש הוא?`,
-      parts: [{ kind: 'choice', choices, answer, fixedOrder: true, hint: 'חפשי מספרים שחוזרים על עצמם. כמה צלעות באותו אורך?' }],
+      parts: [{ kind: 'choice', choices, answer, fixedOrder: true, hint: 'מחפשים מספרים שחוזרים על עצמם. כמה צלעות באותו אורך?' }],
       explanation: `${triRule} כאן: ${lens} ס״מ – ולכן זה משולש <b>${TRI_NAMES[t]}</b>.${eqNote}`,
     };
   }
@@ -216,8 +216,8 @@ export function triangles(rng: Rng, level: Level): Question {
   const { choices, answer } = makeChoices(rng, correct, figs.filter((f) => f !== correct));
   return {
     topic, level, sig: `tr-pick-${t}-${figs.map((f) => f.text).join('')}`,
-    prompt: `בחרי את המשולש ה<b>${TRI_NAMES[t]}</b>. (האורכים בס״מ)`,
-    parts: [{ kind: 'choice', choices, answer, hint: 'בכל משולש השווי את שלושת האורכים. כמה מהם שווים?' }],
+    prompt: `יש לבחור את המשולש ה<b>${TRI_NAMES[t]}</b>. (האורכים בס״מ)`,
+    parts: [{ kind: 'choice', choices, answer, hint: 'בכל משולש משווים את שלושת האורכים. כמה מהם שווים?' }],
     explanation: `${triRule} רק במשולש שבחרנו ${t === 'equilateral' ? 'כל שלוש הצלעות שוות' : t === 'isosceles' ? 'בדיוק שתי צלעות שוות' : 'כל הצלעות באורך שונה'}.`,
   };
 }

@@ -46,3 +46,34 @@ describe('"מועדון החיות של נועה" theme', () => {
     expect(found).toBeGreaterThan(20);
   });
 });
+
+import { themeText, THEMES } from '../src/theme';
+
+describe('two looks and wording for the whole class', () => {
+  const FEM = /(?<![א-ת])(בחרי|כתבי|בדקי|פתרי|ספרי|התחילי|חשבי|לחצי|הסתכלי|השלימי|פרקי|הוסיפי|השווי|חפשי|הורידי|מצאי|שימי|נסי|היעזרי|המשיכי|מלאי|תראי|קראי|הרכיבי|סמני|כפלי|חסרי|דמייני|את יכולה|את מוכנה|ברוכה)(?![א-ת])/;
+
+  it('instructions do not address a girl only', () => {
+    expect(JSON.stringify(buildLessons())).not.toMatch(FEM);
+    for (const t of TOPICS) for (const lv of [1, 2, 3] as const) {
+      const rng = new Rng(lv + t.id.length * 7);
+      for (let i = 0; i < 80; i++) expect(JSON.stringify(GENERATORS[t.id](rng, lv)), t.id).not.toMatch(FEM);
+    }
+  });
+
+  it('every {{word}} resolves in both looks', () => {
+    const all = JSON.stringify(buildLessons()) + homeScene();
+    for (const th of THEMES) expect(themeText(all, th.id)).not.toMatch(/\{\{\w+\}\}/);
+    expect(themeText('{{items}}', 'club')).toBe('חטיפים');
+    expect(themeText('{{items}}', 'space')).toBe('כדורים');
+  });
+
+  it('each friend is drawn in both looks (club animal + astronaut in team kit)', () => {
+    for (const who of ['kitten', 'puppy', 'bunny'] as const) {
+      const h = friend(who, 'cheer');
+      expect(h).toContain('th-club');
+      expect(h).toContain('th-space');
+      expect(h).toContain(`astro-${who}`);
+    }
+    expect(homeScene()).toContain('כדורגל בחלל');
+  });
+});

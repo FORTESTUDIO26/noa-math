@@ -3,7 +3,7 @@
  * Topic icons, practice-mode icons and the home-screen space-station scene.
  */
 import type { TopicId } from './types';
-import { friendAt } from './club';
+import { friendAt, ball } from './club';
 
 const wrap = (body: string, size = 40, label = '') =>
   `<svg class="icon" width="${size}" height="${size}" viewBox="0 0 40 40" ${label ? `role="img" aria-label="${label}"` : 'aria-hidden="true"'} focusable="false">${body}</svg>`;
@@ -41,33 +41,33 @@ export function modeIcon(kind: 'topics' | 'mixed' | 'exam', size = 44): string {
   return wrap(body, size);
 }
 
-/** Home scene: a small cosy club – the kitten peeks from the window, the puppy waits at the door,
- *  the bunny doll sits by the toy basket. */
+/** Home scene for the current look (both are rendered; CSS shows the chosen one). */
 export function homeScene(): string {
+  return `<div class="th-club">${clubScene()}</div><div class="th-space">${spaceScene()}</div>`;
+}
+
+/** "מועדון החיות": the kitten peeks from the window, the puppy waits at the door, the bunny doll sits by the toy basket. */
+export function clubScene(): string {
   return `<div class="scene" role="img" aria-label="מועדון החיות: חתלתולה בחלון, כלבלב בכניסה ובובת ארנבת ליד סל המשחקים">
   <svg viewBox="0 0 360 200" class="scene-svg" aria-hidden="true" focusable="false">
     <rect x="0" y="0" width="360" height="200" rx="24" class="sc-sky"/>
     <path d="M40 40 q8 -14 22 -8 q10 -10 22 2 q12 0 10 12 h-58 q-6 -4 4 -6 z" class="sc-cloud"/>
     <path d="M262 30 q6 -10 17 -6 q8 -8 17 1 q10 0 8 10 h-46 q-5 -3 4 -5 z" class="sc-cloud"/>
     <path d="M0 158 q90 -14 180 -4 q100 10 180 -6 v28 q0 24 -24 24 h-312 q-24 0 -24 -24 z" class="sc-grass"/>
-    <!-- club house -->
     <rect x="96" y="70" width="176" height="104" rx="10" class="sc-wall"/>
     <path d="M84 76 L184 22 L284 76 Z" class="sc-roof" stroke-linejoin="round"/>
     <path d="M110 66 h148" class="sc-roof-scallop"/>
     <rect x="150" y="40" width="68" height="20" rx="10" class="sc-sign"/>
     <text x="184" y="55" class="sc-sign-text">מועדון</text>
-    <!-- window with the kitten -->
     <rect x="112" y="88" width="62" height="50" rx="10" class="sc-window"/>
-    ${friendAt('kitten', 'happy', 116, 90, 54, false)}
+    ${friendAt('kitten', 'happy', 116, 90, 54, false, 'club')}
     <rect x="108" y="134" width="70" height="8" rx="4" class="sc-sill"/>
     <ellipse cx="132" cy="136" rx="6" ry="4" class="k-fur"/><ellipse cx="154" cy="136" rx="6" ry="4" class="k-fur"/>
     <path d="M112 92 q14 18 0 40 M174 92 q-14 18 0 40" class="sc-curtain"/>
-    <!-- door with the puppy -->
     <path d="M200 174 v-58 q0 -20 22 -20 q22 0 22 20 v58 z" class="sc-door"/>
     <circle cx="236" cy="140" r="2.8" class="sc-knob"/>
-    ${friendAt('puppy', 'wave', 192, 112, 66)}
-    <!-- the bunny doll by the toy basket -->
-    ${friendAt('bunny', 'happy', 20, 104, 70)}
+    ${friendAt('puppy', 'wave', 192, 112, 66, true, 'club')}
+    ${friendAt('bunny', 'happy', 20, 104, 70, true, 'club')}
     <path d="M82 160 h44 l-5 22 h-34 z" class="sc-basket"/>
     <path d="M86 166 h36 M88 173 h32" class="sc-basket-line"/>
     <circle cx="96" cy="154" r="9" class="sc-ball"/><path d="M87 154 h18" class="sc-ball-line"/>
@@ -75,6 +75,33 @@ export function homeScene(): string {
     <path d="M300 160 q4 -12 0 -24 M300 148 q8 -6 12 0 q-6 6 -12 0 M300 140 q-8 -6 -12 0 q6 6 12 0" class="sc-flower-stem"/>
     <circle cx="300" cy="134" r="5" class="sc-flower"/>
     <circle cx="322" cy="146" r="4" class="sc-flower sc-flower-2"/>
+  </svg>
+</div>`;
+}
+
+/** "כדורגל בחלל": a soccer pitch on the moon, astronauts in team kits, a ball with a trail of stars. */
+export function spaceScene(): string {
+  const stars = [[22, 22], [70, 14], [110, 40], [160, 18], [205, 34], [250, 14], [40, 64], [330, 92], [12, 100]]
+    .map(([x, y], i) => `<path d="M${x} ${y - 4} l1.2 2.8 l2.8 1.2 l-2.8 1.2 l-1.2 2.8 l-1.2 -2.8 l-2.8 -1.2 l2.8 -1.2 z" class="ss-star${i % 3 === 0 ? ' ss-star-y' : ''}"/>`).join('');
+  const trail = [[300, 84, 3.4], [286, 76, 2.8], [272, 70, 2.3], [259, 66, 1.9]]
+    .map(([x, y, r]) => `<path d="M${x} ${y - r * 1.6} l${r * 0.45} ${r * 1.1} l${r * 1.15} ${r * 0.5} l${-r * 1.15} ${r * 0.5} l${-r * 0.45} ${r * 1.1} l${-r * 0.45} ${-r * 1.1} l${-r * 1.15} ${-r * 0.5} l${r * 1.15} ${-r * 0.5} z" class="ss-trail"/>`).join('');
+  return `<div class="scene" role="img" aria-label="כדורגל בחלל: מגרש על הירח, אסטרונאוטים במדי קבוצה וכדור עם שובל של כוכבים">
+  <svg viewBox="0 0 360 200" class="scene-svg" aria-hidden="true" focusable="false">
+    <rect x="0" y="0" width="360" height="200" rx="24" class="ss-sky"/>
+    ${stars}
+    <circle cx="306" cy="38" r="22" class="ss-earth"/>
+    <path d="M292 30 q8 -8 14 0 q4 8 -6 10 q-8 2 -8 -10 z M310 46 q8 -4 10 4 q-6 6 -10 -4 z" class="ss-land"/>
+    <path d="M0 122 q70 -18 180 -10 q110 6 180 -6 v70 q0 24 -24 24 h-312 q-24 0 -24 -24 z" class="ss-moon"/>
+    <ellipse cx="40" cy="176" rx="14" ry="4" class="ss-crater"/><ellipse cx="320" cy="170" rx="11" ry="3.4" class="ss-crater"/>
+    <path d="M70 182 L290 182 L262 128 L98 128 Z" class="ss-pitch"/>
+    <path d="M180 128 V182 M70 182 L290 182 L262 128 L98 128 Z" class="ss-lines"/>
+    <ellipse cx="180" cy="154" rx="20" ry="8" class="ss-lines"/>
+    <path d="M84 162 v-14 h14 v22" class="ss-goal"/>
+    ${friendAt('puppy', 'wave', 50, 104, 64, true, 'space')}
+    ${friendAt('kitten', 'happy', 146, 92, 72, true, 'space')}
+    ${friendAt('bunny', 'happy', 262, 100, 66, true, 'space')}
+    ${trail}
+    ${ball(244, 64, 8)}
   </svg>
 </div>`;
 }

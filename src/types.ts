@@ -45,7 +45,7 @@ export interface Part {
   suffix?: string;
   /** text: all accepted answers (compared after normalization) */
   accept?: string[];
-  /** short instruction under the input, e.g. "כתבי את שם המקום" */
+  /** short instruction under the input, e.g. "כותבים את שם המקום" */
   fieldHint?: string;
   /** focused hints for typical wrong answers */
   traps?: TrapHint[];

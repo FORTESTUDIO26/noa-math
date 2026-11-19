@@ -125,7 +125,7 @@ describe('"איך עושים את זה?" cards', () => {
     expect(v0.choices!.map((c) => c.text)).toEqual(['7', '70', '700']);
     expect(v0.choices!.find((c) => c.id === v0.answer)!.text).toBe('70');
     expect(checkPart(v0, v0.choices![0].id).trap).toContain('הספרה עצמה');
-    expect(v0.hint).toBe('התחילי מימין. הספרה הראשונה היא ספרת היחידות. באיזה מקום נמצאת הספרה 7?');
+    expect(v0.hint).toBe('מתחילים מימין. הספרה הראשונה היא ספרת היחידות. באיזה מקום נמצאת הספרה 7?');
   });
 
   it('place-value card: 4-box decomposition of 7639 with clickable bays, try-it 7052 with a 0', () => {

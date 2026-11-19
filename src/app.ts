@@ -7,7 +7,8 @@ import { getLesson } from './lessons';
 import { esc, renderBlank } from './format';
 import { checkPart, splitFields, isFilled } from './answers';
 import { friend, packs } from './club';
-import { topicIcon, modeIcon, homeScene, puzzleIcon } from './art';
+import { topicIcon, modeIcon, homeScene, puzzleIcon, clubScene, spaceScene } from './art';
+import { THEMES, themeText, type ThemeId } from './theme';
 
 /* ================================================================== state */
 
@@ -20,7 +21,8 @@ type Screen =
   | { name: 'summary' }
   | { name: 'exam' }
   | { name: 'examResults' }
-  | { name: 'review' };
+  | { name: 'review' }
+  | { name: 'welcome'; edit?: boolean; back?: Screen };
 
 interface Practice { mode: 'topic' | 'mixed'; topic?: TopicId; questions: Question[]; prog: PartProg[][]; index: number; counted: boolean[]; finished: boolean }
 interface Exam { questions: Question[]; answers: string[][]; index: number; submitted: boolean; correct?: boolean[]; confirm?: boolean }
@@ -33,9 +35,11 @@ export interface AppState {
   practice: Practice | null;
   exam: Exam | null;
   lessonTry: Record<string, PartProg[]>;
+  /** saved on this device only: first name (optional) and the chosen look */
+  profile?: { name: string; theme: ThemeId };
 }
 
-const fresh = (): AppState => ({ v: 1, screen: { name: 'home' }, stats: {}, recent: [], practice: null, exam: null, lessonTry: {} });
+const fresh = (): AppState => ({ v: 1, screen: { name: 'welcome' }, stats: {}, recent: [], practice: null, exam: null, lessonTry: {} });
 
 function load(): AppState {
   try {
@@ -43,7 +47,10 @@ function load(): AppState {
     if (!raw) return fresh();
     const s = JSON.parse(raw) as AppState;
     if (s.v !== 1 || !s.screen) return fresh();
-    return { ...fresh(), ...s };
+    const st = { ...fresh(), ...s };
+    // children who already practised keep their progress and get "מועדון החיות" by default
+    if (!st.profile) st.profile = { name: '', theme: 'club' };
+    return st;
   } catch { return fresh(); }
 }
 function save() {
@@ -51,6 +58,9 @@ function save() {
 }
 
 let state: AppState = load();
+/** what is being chosen on the welcome screen (not saved until "בואו נתחיל" / "שמירה") */
+let draft: { name: string; theme: ThemeId } = { name: state.profile?.name ?? '', theme: state.profile?.theme ?? 'club' };
+const currentTheme = (): ThemeId => (state.screen.name === 'welcome' ? draft.theme : state.profile?.theme ?? 'club');
 const rng = new Rng();
 let root: HTMLElement;
 let focusSel: string | null = null;
@@ -113,7 +123,7 @@ function answer(key: string, partIdx: number, value: string) {
   const firstField = `[data-field="${key}-${partIdx}-0"]`;
   if (res.empty) {
     focusSel = part.kind === 'fields' ? firstField : `[data-input="${key}-${partIdx}"]`;
-    pp.hintText = part.kind === 'fields' ? 'מלאי ספרה בכל אחת מארבע השורות ואז לחצי על ״בדיקה״.' : pp.hintText;
+    pp.hintText = part.kind === 'fields' ? 'ממלאים ספרה בכל אחת מארבע השורות ואז לוחצים על ״בדיקה״.' : pp.hintText;
     save(); render(); return;
   }
   if (res.ok) {
@@ -173,7 +183,7 @@ function questionHead(q: Question) {
   return `<div class="q-prompt">${q.prompt}</div>` +
     (q.math ? `<div class="q-math${q.math.length > 17 ? ' q-math-long' : ''}" dir="ltr">${renderBlank(esc(q.math))}</div>` : '') +
     (q.figure ? `<div class="q-figure${geo ? ' q-figure-part' : ''}">${q.figure}</div>` : '') +
-    (geo ? `<div class="part-note">${puzzleIcon(22)}<span>${q.figure ? 'חלק פאזל מהמועדון' : 'מצאי את חלק הפאזל הנכון'}</span></div>` : '');
+    (geo ? `<div class="part-note">${puzzleIcon(22)}<span>${q.figure ? '{{geoNote}}' : '{{geoPick}}'}</span></div>` : '');
 }
 
 function choiceGridClass(q: Question, pi: number) {
@@ -218,7 +228,7 @@ function fieldRows(part: Part, values: string[], attr: (i: number) => string, st
 function feedbackGood(first: boolean, seed: string): string {
   // the puppy wags its tail or the kitten raises a paw
   const puppy = seed.length % 2 === 0;
-  return `<div class="good" role="status">${friend(puppy ? 'puppy' : 'kitten', 'cheer', 58, puppy)}<div><b>${first ? 'נכון! כל הכבוד!' : 'נכון! הצלחת בניסיון השני.'}</b><span>${puppy ? 'הכלבלב מכשכש בזנב.' : 'החתלתולה מרימה כפה.'}</span></div></div>`;
+  return `<div class="good" role="status">${friend(puppy ? 'puppy' : 'kitten', 'cheer', 58, puppy)}<div><b>${first ? 'נכון! כל הכבוד!' : 'נכון! הצלחת בניסיון השני.'}</b><span>${puppy ? '{{cheerA}}' : '{{cheerB}}'}</span></div></div>`;
 }
 
 /** Interactive question with hints (practice + lesson "עכשיו תורך") */
@@ -261,7 +271,7 @@ function renderRunner(q: Question, prog: PartProg[], key: string): string {
       h += `</div>`;
     }
     if (pp.status === 'open' && (pp.attempts === 1 || (pp.attempts === 0 && pp.hintText))) {
-      h += `<div class="hint" role="status">${friend('bunny', 'think', 48)}<div class="bubble"><b>${pp.attempts ? 'רמז' : 'שימי לב'}:</b> ${pp.hintText ?? part.hint}${pp.attempts ? '<div class="try-again">נסי שוב!</div>' : ''}</div></div>`;
+      h += `<div class="hint" role="status">${friend('bunny', 'think', 48)}<div class="bubble"><b>${pp.attempts ? 'רמז' : 'שימו לב'}:</b> ${pp.hintText ?? part.hint}${pp.attempts ? '<div class="try-again">אפשר לנסות שוב!</div>' : ''}</div></div>`;
     }
     if (pp.status !== 'open' && part.after) h += `<div class="after">${part.after}</div>`;
     if (pp.status === 'correct') h += feedbackGood(pp.attempts === 0, q.sig);
@@ -306,19 +316,52 @@ function homeView(): string {
     `<button class="card mode" data-act="${act}">${icon}<span class="mode-text"><b>${title}</b><small>${sub}</small></span><span class="mode-go" aria-hidden="true">←</span></button>`;
   return `<main class="screen home">
     <div class="home-head">
-      <h1 class="app-title">המתמטיקה של נועה</h1>
+      <div><h1 class="app-title">המתמטיקה של נועה</h1><p class="greet">${state.profile?.name ? `היי, ${esc(state.profile.name)}!` : 'היי!'}</p></div>
       <span class="countdown">${d > 0 ? `עוד ${d} ימים למבחן · יום חמישי 3.12` : d === 0 ? 'היום המבחן – בהצלחה!' : 'בהצלחה בהמשך!'}</span>
     </div>
     ${homeScene()}
-    <p class="hello-text">שלום נועה! ברוכה הבאה למועדון החיות. במה נתרגל היום?</p>
+    <p class="hello-text">{{welcome}} במה מתרגלים היום?</p>
     ${resume}
     <nav class="modes" aria-label="דרכי תרגול">
       ${mode('topics', modeIcon('topics'), 'תרגול לפי נושא', 'הסבר, דוגמה ו־6 שאלות')}
       ${mode('start-mixed', modeIcon('mixed'), 'תרגול מעורב', `${CONFIG.mixedLength} שאלות מכל הנושאים, יותר ממה שקשה לך`)}
       ${mode('start-exam', modeIcon('exam'), 'מבחן לדוגמה', 'כל נושאי המבחן, פתרונות בסוף')}
     </nav>
+    <div class="settings-row">${btn('settings', 'שינוי שם ועיצוב', 'btn-link')}</div>
     ${weak.length ? `<section class="weak"><h2>כדאי לחזק</h2><div class="chips">${weak.map((t) => btn('open-topic', `${topicIcon(t.id, 22)}<span>${t.name}</span>`, 'chip', `data-topic="${t.id}"`)).join('')}</div></section>` : ''}
   </main>`;
+}
+
+function welcomeView(edit: boolean): string {
+  const opt = (t: (typeof THEMES)[number]) => {
+    const on = draft.theme === t.id;
+    return `<button type="button" class="theme-opt${on ? ' on' : ''}" data-act="pick-theme" data-theme-id="${t.id}" aria-pressed="${on}">
+      <span class="theme-thumb" data-th="${t.id}">${t.id === 'club' ? clubScene() : spaceScene()}</span>
+      <span class="theme-name"><b>${t.name}</b><small>${t.blurb}</small></span>
+      <span class="theme-mark">${on ? '● נבחר' : 'לבחירה'}</span></button>`;
+  };
+  return `<main class="screen welcome">
+    <h1 class="app-title">המתמטיקה של נועה</h1>
+    <p class="lead">תרגול מתמטיקה לכיתה ג׳ – הסבר קצר, דוגמה ותרגול.</p>
+    <form class="welcome-form" data-form="welcome" autocomplete="off">
+      <label class="field-label" for="kid-name">מה השם שלך? <small>(לא חובה)</small></label>
+      <input id="kid-name" class="name-input" type="text" inputmode="text" lang="he" dir="rtl" maxlength="20" autocomplete="off" autocapitalize="words" spellcheck="false" value="${esc(draft.name)}" placeholder="שם פרטי" />
+      <div class="field-label">איך האפליקציה תיראה?</div>
+      <div class="theme-opts" role="group" aria-label="בחירת עיצוב">${THEMES.map(opt).join('')}</div>
+      <p class="field-hint">השם והעיצוב נשמרים רק במכשיר הזה. אפשר לשנות אותם בכל זמן${edit ? ', וההתקדמות נשארת כמו שהיא' : ''}.</p>
+      <div class="col">
+        <button type="submit" class="btn btn-primary btn-wide">${edit ? 'שמירה' : 'בואו נתחיל'}</button>
+        ${edit ? btn('welcome-cancel', 'ביטול', 'btn btn-wide') : btn('welcome-skip', 'להתחיל בלי שם', 'btn-link')}
+      </div>
+    </form>
+  </main>`;
+}
+
+function saveProfile(withName: boolean) {
+  const name = withName ? draft.name.replace(/\s+/g, ' ').trim().slice(0, 20) : '';
+  state.profile = { name, theme: draft.theme };
+  const sc = state.screen;
+  go(sc.name === 'welcome' && sc.back ? sc.back : { name: 'home' });
 }
 
 function topicsView(): string {
@@ -329,7 +372,7 @@ function topicsView(): string {
       const badge = s && s.seen ? `${s.firstTry} מתוך ${s.seen} בניסיון ראשון` : 'עוד לא תרגלת';
       return `<button class="topic" data-act="open-topic" data-topic="${t.id}">${topicIcon(t.id, 38)}<span class="topic-text"><b>${t.name}</b><small class="topic-stat">${badge}</small></span><span class="mode-go" aria-hidden="true">←</span></button>`;
     }).join('') + `</div>`;
-  return `${header('תרגול לפי נושא')}<main class="screen"><p class="lead">בחרי נושא. לפני התרגול יש הסבר קצר ודוגמה.</p>${group('numbers', 'מספרים ופעולות')}${group('geometry', 'גיאומטריה')}</main>`;
+  return `${header('תרגול לפי נושא')}<main class="screen"><p class="lead">בוחרים נושא. לפני התרגול יש הסבר קצר ודוגמה.</p>${group('numbers', 'מספרים ופעולות')}${group('geometry', 'גיאומטריה')}</main>`;
 }
 
 /** lesson = steps: for every skill an example screen, then a "עכשיו תורך" screen */
@@ -430,7 +473,7 @@ function examView(): string {
     return `${header('מבחן לדוגמה', null, modeIcon('exam', 28))}<main class="screen"><div class="confirm">
       ${friend('bunny', 'think', 66, true)}
       <h2>להגיש את המבחן?</h2>
-      ${missing.length ? `<p>עוד לא ענית על ${missing.length === 1 ? 'שאלה' : 'השאלות'}: ${missing.map((i) => i + 1).join(', ')}.</p>` : '<p>ענית על כל השאלות. אחרי ההגשה תראי את התוצאות והפתרונות.</p>'}
+      ${missing.length ? `<p>עוד לא ענית על ${missing.length === 1 ? 'שאלה' : 'השאלות'}: ${missing.map((i) => i + 1).join(', ')}.</p>` : '<p>ענית על כל השאלות. אחרי ההגשה רואים את התוצאות והפתרונות.</p>'}
       <div class="col">${btn('exam-submit-yes', 'כן, להגיש', 'btn btn-primary btn-wide')}${btn('exam-cancel', 'לא, אני רוצה לחזור לשאלות', 'btn btn-wide')}</div></div></main>`;
   }
   let h = `${header('מבחן לדוגמה', 'home', modeIcon('exam', 28))}<main class="screen exam">
@@ -477,7 +520,7 @@ function examResultsView(): string {
   const pct = Math.round((ok / n) * 100);
   return `${header('תוצאות המבחן')}<main class="screen results">
     <div class="result-hero">${friend('kitten', pct >= 70 ? 'cheer' : 'wave', 84, true)}<div><div class="big-score">${ok} מתוך ${n} <small>(${pct}%)</small></div>
-    <p class="score-line">${pct >= 90 ? 'מצוין! את מוכנה.' : pct >= 70 ? 'יפה מאוד! עוד קצת תרגול בנושאים המסומנים.' : 'כדאי לתרגל את הנושאים המסומנים – את יכולה!'}</p></div></div>
+    <p class="score-line">${pct >= 90 ? 'מצוין! מוכנים למבחן.' : pct >= 70 ? 'יפה מאוד! עוד קצת תרגול בנושאים המסומנים.' : 'כדאי לתרגל עוד את הנושאים המסומנים.'}</p></div></div>
     <table class="by-topic"><caption>תוצאה לפי נושא</caption><thead><tr><th>נושא</th><th>נכון</th><th><span class="sr">פעולות</span></th></tr></thead><tbody>
     ${examTopicRows(e).map((r) => `<tr class="${r.ok < r.total ? 'has-mistakes' : 'all-ok'}"><td><span class="row-topic">${topicIcon(r.topic, 24)}${topicById(r.topic).name}</span></td>
       <td class="nowrap score-cell">${r.ok < r.total ? '✗' : '✓'} ${r.ok}/${r.total}</td>
@@ -528,8 +571,11 @@ export function render() {
     case 'exam': html = state.exam ? examView() : homeView(); break;
     case 'examResults': html = state.exam?.correct ? examResultsView() : homeView(); break;
     case 'review': html = state.exam?.correct ? reviewView() : homeView(); break;
+    case 'welcome': html = welcomeView(s.edit ?? false); break;
   }
-  root.innerHTML = html;
+  const theme = currentTheme();
+  document.documentElement.dataset.theme = theme;
+  root.innerHTML = themeText(html, theme);
   for (const [id, place] of openBays) {
     const bay = root.querySelector<HTMLElement>(`[data-cargo-id="${id}"] [data-act=bay][data-place="${place}"]`);
     if (bay) openBay(bay);
@@ -562,6 +608,19 @@ function onClick(ev: Event) {
     case 'back-to-results': go({ name: 'examResults' }); break;
     case 'choose': answer(el.dataset.key!, Number(el.dataset.part), el.dataset.choice!); break;
     case 'bay': openBay(el); break;
+    case 'settings':
+      draft = { name: state.profile?.name ?? '', theme: state.profile?.theme ?? 'club' };
+      go({ name: 'welcome', edit: true, back: { name: 'home' } });
+      break;
+    case 'pick-theme': {
+      const inp = root.querySelector<HTMLInputElement>('#kid-name');
+      if (inp) draft.name = inp.value;
+      draft.theme = el.dataset.themeId as ThemeId;
+      render();
+      break;
+    }
+    case 'welcome-skip': saveProfile(false); break;
+    case 'welcome-cancel': go({ name: 'home' }); break;
     case 'lesson-step': {
       const sc = state.screen;
       if (sc.name === 'lesson') { const n = lessonSteps(sc.topic).length; go({ ...sc, step: Math.max(0, Math.min(n - 1, Number(el.dataset.step))) }); }
@@ -596,6 +655,13 @@ function onClick(ev: Event) {
 }
 
 function onSubmit(ev: Event) {
+  const wf = (ev.target as HTMLElement).closest<HTMLFormElement>('form[data-form="welcome"]');
+  if (wf) {
+    ev.preventDefault();
+    draft.name = wf.querySelector<HTMLInputElement>('#kid-name')!.value;
+    saveProfile(true);
+    return;
+  }
   const ff = (ev.target as HTMLElement).closest<HTMLFormElement>('form.fields-form');
   if (ff) {
     ev.preventDefault();
@@ -612,6 +678,7 @@ function onSubmit(ev: Event) {
 
 function onInput(ev: Event) {
   const t = ev.target as HTMLInputElement;
+  if (t.id === 'kid-name') { draft.name = t.value; return; }
   if (t.dataset.numeric) {
     // numeric boxes keep digits only (the numeric keyboard may still allow other characters)
     const clean = t.value.replace(/[^\d]/g, '');
@@ -657,7 +724,7 @@ function openBay(el: HTMLElement) {
   el.classList.add('bay-open');
   el.setAttribute('aria-pressed', 'true');
   const panel = cargo.querySelector('.bay-packs');
-  if (panel) panel.innerHTML = packs(Number(el.dataset.digit), Number(el.dataset.place));
+  if (panel) panel.innerHTML = themeText(packs(Number(el.dataset.digit), Number(el.dataset.place)), currentTheme());
   const id = (cargo as HTMLElement).dataset.cargoId;
   if (id) openBays.set(id, el.dataset.place!);
 }

@@ -80,10 +80,10 @@ describe('word answers are choices', () => {
 });
 
 describe('decomposition with four boxes', () => {
-  it('פרקי את המספר 7639 → 7 | 6 | 3 | 9, rows אלפים → יחידות', () => {
+  it('יש לפרק את המספר 7639 → 7 | 6 | 3 | 9, rows אלפים → יחידות', () => {
     const q = qFields('placeValue', 1, 7639);
     const p = q.parts[0];
-    expect(q.prompt).toContain('פרקי את המספר');
+    expect(q.prompt).toContain('יש לפרק את המספר');
     expect(p.fields!.map((f) => f.label)).toEqual(['אלפים', 'מאות', 'עשרות', 'יחידות']);
     expect(p.fields!.map((f) => f.answer)).toEqual(['7', '6', '3', '9']);
     expect(checkPart(p, '7|6|3|9').ok).toBe(true);

@@ -76,6 +76,42 @@ async function answerPractice(mode = 'right') {
 try {
   /* ---------------------------------------------------------------- home */
   await page.goto(URL);
+  /* ---------------------------------------------------------------- first visit: name + look */
+  check('first visit opens the welcome screen', (await page.locator('#kid-name').count()) === 1 && (await page.locator('[data-act=pick-theme]').count()) === 2);
+  check('welcome keeps the app name', (await text('h1')) === 'המתמטיקה של נועה');
+  const themeNames = (await page.locator('.theme-name b').allInnerTexts()).join(',');
+  check('two looks offered: מועדון החיות, כדורגל בחלל', themeNames === 'מועדון החיות,כדורגל בחלל', themeNames);
+  check('each look has a small picture', (await page.locator('.theme-thumb .scene-svg').count()) === 2);
+  check('name box uses the regular keyboard', (await page.locator('#kid-name').getAttribute('inputmode')) === 'text');
+  await noHScroll('welcome');
+  await shot('00-welcome');
+  await page.fill('#kid-name', '  אורי ');
+  await page.click('form[data-form=welcome] button[type=submit]');
+  check('home greets by name: "היי, אורי!" under the app name', (await text('.greet')) === 'היי, אורי!' && (await text('h1')) === 'המתמטיקה של נועה');
+  check('default look is מועדון החיות', (await page.evaluate(() => document.documentElement.dataset.theme)) === 'club');
+  check('"שינוי שם ועיצוב" link on home', (await page.locator('[data-act=settings]').count()) === 1);
+  {
+    const ctxS = await browser.newContext({ viewport: { width: 360, height: 760 }, isMobile: true, hasTouch: true });
+    const pS = await ctxS.newPage();
+    await pS.goto(URL);
+    await pS.click('[data-act=welcome-skip]');
+    check('can start without a name', (await pS.locator('.modes .card').count()) === 3 && (await pS.locator('.greet').innerText()) === 'היי!');
+    await pS.click('[data-act=start-mixed]');
+    check('…and practise right away', (await pS.locator('.progress-text').innerText()) === 'שאלה 1 מתוך 8');
+    await pS.reload();
+    check('no welcome screen again after a refresh', (await pS.locator('#kid-name').count()) === 0);
+    await ctxS.close();
+  }
+  {
+    // a child who practised with the old version keeps progress and gets מועדון החיות
+    const ctxO = await browser.newContext({ viewport: { width: 360, height: 760 } });
+    const pO = await ctxO.newPage();
+    await pO.goto(URL);
+    await pO.evaluate((k) => localStorage.setItem(k, JSON.stringify({ v: 1, screen: { name: 'home' }, stats: { angles: { seen: 3, firstTry: 1, wrong: 2 } }, recent: [], practice: null, exam: null, lessonTry: {} })), KEY);
+    await pO.reload();
+    check('existing users: no welcome, club look, progress kept', (await pO.locator('#kid-name').count()) === 0 && (await pO.evaluate(() => document.documentElement.dataset.theme)) === 'club' && (await pO.locator('.weak .chip').count()) === 1);
+    await ctxO.close();
+  }
   check('home title', (await text('h1')) === 'המתמטיקה של נועה');
   check('three practice modes on home', (await page.locator('.modes .card').count()) === 3);
   check('html is RTL Hebrew', await page.evaluate(() => document.documentElement.dir === 'rtl' && document.documentElement.lang === 'he'));
@@ -148,7 +184,7 @@ try {
     await page.fill('[data-input="P-0"]', String(Number(q.parts[0].answer) + 1));
     await page.click('form[data-key="P"] button[type=submit]');
     const h = await text('.hint');
-    check('number line hint: "בדקי בכמה המספרים גדלים בין שתי שנתות"', h.includes('בדקי בכמה המספרים גדלים בין שתי שנתות'), h);
+    check('number line hint: "בודקים בכמה המספרים גדלים בין שתי שנתות"', h.includes('בודקים בכמה המספרים גדלים בין שתי שנתות'), h);
     check('can try again after hint', (await page.locator('[data-input="P-0"]').count()) === 1);
     await page.fill('[data-input="P-0"]', Number(q.parts[0].answer).toLocaleString('en-US')); // with thousands comma too
     await page.click('form[data-key="P"] button[type=submit]');
@@ -422,6 +458,50 @@ try {
     }
     check(`layout sweep: ${seen} questions fit 360px without horizontal scroll`, bad.length === 0, bad.join('; '));
   }
+  /* ---------------------------------------------------------------- switching the look keeps question + answer */
+  {
+    await page.click('[data-act=home]');
+    await page.click('[data-act=topics]');
+    await page.click('[data-act=open-topic][data-topic=multMeaning]');
+    await page.click('.lesson-top [data-act=start-topic]');
+    await answerPractice('right');          // q1 answered
+    await page.click('[data-act=next-q]');
+    const q2 = (await state()).practice.questions[1];
+    const p0 = q2.parts[0];
+    if (p0.kind === 'choice') await page.click(`[data-act=choose][data-key=P][data-choice="${p0.answer}"]`);
+    else await page.fill('[data-input="P-0"]', p0.answer), await page.click('form[data-key="P"][data-part="0"] button');
+    await shot('20-same-question-club');
+    const before = await page.locator('.q-card').innerText();
+    await page.click('[data-act=home]');
+    await page.click('[data-act=settings]');
+    check('settings screen keeps the name', (await page.inputValue('#kid-name')) === 'אורי');
+    await page.click('[data-act=pick-theme][data-theme-id=space]');
+    await page.click('form[data-form=welcome] button[type=submit]');
+    check('look switched to כדורגל בחלל', (await page.evaluate(() => document.documentElement.dataset.theme)) === 'space');
+    check('greeting kept after the switch', (await text('.greet')) === 'היי, אורי!');
+    await page.click('[data-act=continue-practice]');
+    const after = await page.locator('.q-card').innerText();
+    check('same question (2 of 6) and the same answer after switching the look', (await text('.progress-text')) === 'שאלה 2 מתוך 6' && (await page.locator('.q-card .choice.right, .q-card .num-result.correct').count()) >= 1, `${before.slice(0, 40)} | ${after.slice(0, 40)}`);
+    check('astronauts shown, animals hidden', (await page.locator('.q-card .astro:visible').count()) >= 1 && (await page.locator('.q-card .friend:visible').count()) === 0);
+    check('theme words switched (חטיפים → כדורים)', !(await page.locator('.q-card').innerText()).includes('חטיפים'));
+    await page.reload();
+    check('after refresh: still question 2, answer kept, still כדורגל בחלל', (await text('.progress-text')) === 'שאלה 2 מתוך 6' && (await page.locator('.q-card .choice.right, .q-card .num-result.correct').count()) >= 1 && (await page.evaluate(() => document.documentElement.dataset.theme)) === 'space');
+    await shot('21-same-question-space');
+    // exam answer survives a switch too
+    await page.click('[data-act=home]');
+    await page.click('[data-act=start-exam]');
+    const ex = (await state()).exam;
+    const f = ex.questions[0].parts[0].fields;
+    for (let i = 0; i < f.length; i++) await page.fill(`[data-exam-field="0:${i}"]`, f[i].answer);
+    await page.click('[data-act=home]');
+    await page.click('[data-act=settings]');
+    await page.click('[data-act=pick-theme][data-theme-id=club]');
+    await page.click('form[data-form=welcome] button[type=submit]');
+    await page.click('[data-act=continue-exam]');
+    check('exam answer kept after switching back to מועדון החיות', (await page.inputValue('[data-exam-field="0:0"]')) === f[0].answer && (await page.evaluate(() => document.documentElement.dataset.theme)) === 'club');
+    await page.click('[data-act=home]');
+  }
+
   /* ---------------------------------------------------------------- 390px pass */
   {
     const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true, locale: 'he-IL' });
@@ -433,6 +513,10 @@ try {
       if (w.sw > w.cw) bad.push(`${where} ${w.sw}/${w.cw}`);
     };
     await p2.goto(URL);
+    await p2.click('[data-act=pick-theme][data-theme-id=space]');
+    await p2.fill('#kid-name', 'מאיה');
+    await p2.click('form[data-form=welcome] button[type=submit]');
+    check('390px pass runs in the "כדורגל בחלל" look', (await p2.evaluate(() => document.documentElement.dataset.theme)) === 'space' && (await p2.locator('.scene .astro').count()) >= 3);
     await fits('home');
     await p2.screenshot({ path: path.join(shots, '390-home.png'), fullPage: true });
     await p2.click('[data-act=topics]');
@@ -472,7 +556,7 @@ try {
     await fits('exam results');
     await p2.click('[data-act=review]');
     await fits('exam review');
-    check(`390px: ${screens} screens (all lesson steps, 13 rounds, exam, results, review) without horizontal scroll`, bad.length === 0, bad.join('; '));
+    check(`390px, כדורגל בחלל: ${screens} screens (all lesson steps, 13 rounds, exam, results, review) without horizontal scroll`, bad.length === 0, bad.join('; '));
     await ctx2.close();
   }
 

@@ -37,14 +37,17 @@ export function numberLine(o: NumberLineOpts): string {
   const longest = fmt(o.start + o.step * (o.count - 1)).length;
   const fs = longest >= 5 ? 13 : 15;
   let b = '';
-  // a garden path with stepping stones at equal distances
-  b += `<line x1="6" y1="${y}" x2="${W - 4}" y2="${y}" class="nl-rail"/>`;
+  // club: a garden path with stepping stones · space: a moon pitch with field marks – same equal distances
+  b += `<g class="th-club"><line x1="6" y1="${y}" x2="${W - 4}" y2="${y}" class="nl-rail"/></g>`;
+  b += `<g class="th-space"><rect x="2" y="${y - 12}" width="${W - 4}" height="24" rx="6" class="nl-pitch"/><line x1="2" y1="${y}" x2="${W - 2}" y2="${y}" class="nl-pitch-line"/></g>`;
   b += `<line x1="6" y1="${y}" x2="${W - 4}" y2="${y}" class="nl-line"/>`;
   b += `<path d="M${W - 4} ${y} l-11 -6 v12 z" class="nl-arrow"/>`;
   for (let i = 0; i < o.count; i++) {
-    b += `<ellipse cx="${X(i)}" cy="${y}" rx="${i === o.unknown ? 14 : 12.5}" ry="${i === o.unknown ? 8 : 7}" class="nl-station${i === o.unknown ? ' nl-station-q' : ''}"/>`;
+    const q = i === o.unknown;
+    b += `<ellipse cx="${X(i)}" cy="${y}" rx="${q ? 14 : 12.5}" ry="${q ? 8 : 7}" class="nl-station th-club${q ? ' nl-station-q' : ''}"/>`;
+    b += `<g class="th-space"><line x1="${X(i)}" y1="${y - 12}" x2="${X(i)}" y2="${y + 12}" class="nl-mark${q ? ' nl-mark-q' : ''}"/><circle cx="${X(i)}" cy="${y}" r="${q ? 6.5 : 5}" class="nl-disc${q ? ' nl-station-q' : ''}"/></g>`;
   }
-  // the kitten sits on the first stone that has a number
+  // the kitten / the striker waits on the first mark that has a number
   const kStone = o.labeled[0] ?? 0;
   b += friendAt('kitten', 'happy', X(kStone) - 20, y - 46, 40, true);
   for (let i = 0; i < o.count; i++) {
@@ -66,7 +69,7 @@ export function numberLine(o: NumberLineOpts): string {
       b += `<text x="${r1(xm)}" y="${y - 32}" class="nl-jlabel" font-size="12">+${fmt(o.step)}</text>`;
     }
   }
-  const label = `ישר מספרים: שביל עם ${o.count} אבני דריכה במרווחים שווים` + (o.unknown !== undefined ? ' ואבן עם סימן שאלה' : '');
+  const label = `ישר מספרים: ${o.count} {{pathMarks}} במרווחים שווים` + (o.unknown !== undefined ? ' ואחד מהם עם סימן שאלה' : '');
   return svgWrap(`0 0 ${W} 110`, b, label, 'fig fig-wide');
 }
 

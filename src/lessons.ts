@@ -67,13 +67,13 @@ export function buildLessons(): Record<TopicId, Lesson> {
       skills: [
         {
           title: 'פירוק לאלפים, מאות, עשרות ויחידות',
-          explain: 'כל ספרה נכנסת למגירה שלה בשידה של הארנבת: אלפים, מאות, עשרות או יחידות. בפירוק כותבים בכל שורה את הספרה של אותה מגירה, ואם המגירה ריקה – כותבים 0.',
+          explain: 'כל ספרה נכנסת ל{{drawer}} שלה ב{{chest}}: אלפים, מאות, עשרות או יחידות. בפירוק כותבים בכל שורה את הספרה של אותה מגירה, ואם המגירה ריקה – כותבים 0.',
           example: {
-            task: 'פרקי את המספר 7639.',
-            figure: cargoBays(7639, { interactive: true, highlight: 1, id: 'pv-ex', prompt: 'לחצי על מגירת העשרות (מסומנת בחץ) – הארנבת תפתח אותה' }) + notebookRows(7639),
+            task: 'מפרקים את המספר 7639.',
+            figure: cargoBays(7639, { interactive: true, highlight: 1, id: 'pv-ex', prompt: 'לוחצים על {{drawerOf}} העשרות (מסומנת בחץ) – {{opener}} תפתח אותה' }) + notebookRows(7639),
             steps: [
               'מעבירים כל ספרה לשורה שלה: 7 אלפים, 6 מאות, 3 עשרות ו־9 יחידות.',
-              `כמה שווה כל מגירה? הארנבת פותחת את מגירת העשרות: 3 חבילות של 10, ${m('10 + 10 + 10 = 30')}.`,
+              `כמה שווה כל {{drawer}}? {{opener}} פותחת את {{drawerOf}} העשרות: 3 חבילות של 10, ${m('10 + 10 + 10 = 30')}.`,
               `באותו אופן: 7 אלפים הם ${m('7,000')}, ו־6 מאות הן ${m('600')}.`,
             ],
             answer: `לפי ערכים: ${m('7,639 = 7,000 + 600 + 30 + 9')}`,
@@ -82,14 +82,14 @@ export function buildLessons(): Record<TopicId, Lesson> {
         },
         {
           title: 'הרכבת מספר',
-          explain: 'כותבים ספרה אחת לכל מגירה, לפי הסדר: אלפים, מאות, עשרות, יחידות. אם מגירה ריקה – כותבים בה 0.',
+          explain: 'כותבים ספרה אחת לכל {{drawer}}, לפי הסדר: אלפים, מאות, עשרות, יחידות. אם {{drawer}} ריקה – כותבים בה 0.',
           example: {
             task: 'לכתוב את המספר: 2 אלפים, 4 עשרות ו־9 יחידות',
             figure: cargoBays(2049, { highlight: 2 }),
-            steps: ['אלפים: 2. מאות: אין – המגירה ריקה, כותבים 0 (מסומנת בחץ).', 'עשרות: 4. יחידות: 9.'],
+            steps: ['אלפים: 2. מאות: אין – {{theDrawer}} ריקה, כותבים 0 (מסומנת בחץ).', 'עשרות: 4. יחידות: 9.'],
             answer: m('2,049'),
           },
-          tryIt: tq('placeValue', 'pv2', 'כתבי את המספר: <b>5 אלפים, 3 מאות ו־8 יחידות</b>.', [num(5308, 'אין עשרות במספר. מה כותבים במקום העשרות?')],
+          tryIt: tq('placeValue', 'pv2', 'כותבים את המספר: <b>5 אלפים, 3 מאות ו־8 יחידות</b>.', [num(5308, 'אין עשרות במספר. מה כותבים במקום העשרות?')],
             `אלפים 5, מאות 3, עשרות – אין, לכן 0, יחידות 8. המספר: ${m('5,308')}.`, { hintFigure: cargoBays(5308, { highlight: 1 }) }),
         },
       ],
@@ -101,26 +101,26 @@ export function buildLessons(): Record<TopicId, Lesson> {
       skills: [
         {
           title: 'באיזה מקום נמצאת הספרה?',
-          explain: 'המקום הוא השם של המגירה: יחידות, עשרות, מאות או אלפים. מתחילים מימין – הספרה הימנית היא היחידות.',
+          explain: 'המקום הוא השם של {{theDrawer}}: יחידות, עשרות, מאות או אלפים. מתחילים מימין – הספרה הימנית היא היחידות.',
           example: {
             task: 'באיזה מקום נמצאת הספרה 3 במספר 7639?',
             figure: cargoBays(7639, { highlight: 1 }),
-            steps: ['מתחילים מימין: 9 ביחידות, 3 בעשרות, 6 במאות, 7 באלפים.', 'הספרה 3 נמצאת במגירת העשרות (מסומנת בחץ).'],
+            steps: ['מתחילים מימין: 9 ביחידות, 3 בעשרות, 6 במאות, 7 באלפים.', 'הספרה 3 נמצאת ב{{drawerOf}} העשרות (מסומנת בחץ).'],
             answer: 'התשובה: <b>עשרות</b> – זה המקום.',
           },
           tryIt: lessonQ(qPlaceChoice('digitValue', 1, 2514, 2), 'dv1'),
         },
         {
           title: 'מה הערך של הספרה?',
-          explain: 'הערך הוא כמה הספרה שווה במקום שלה. קודם מוצאים את המקום, ואחר כך סופרים את החבילות שבמגירה.',
+          explain: 'הערך הוא כמה הספרה שווה במקום שלה. קודם מוצאים את המקום, ואחר כך סופרים את החבילות שב{{drawer}}.',
           example: {
             task: 'מה הערך של הספרה 3 במספר 7639?',
-            figure: cargoBays(7639, { interactive: true, highlight: 1, id: 'dv-ex', prompt: 'לחצי על מגירת העשרות' }),
-            steps: ['הספרה 3 נמצאת במקום העשרות.', `הארנבת פותחת את מגירת העשרות: יש בה 3 חבילות של 10, ${m('3 × 10 = 30')}.`],
+            figure: cargoBays(7639, { interactive: true, highlight: 1, id: 'dv-ex', prompt: 'לוחצים על {{drawerOf}} העשרות' }),
+            steps: ['הספרה 3 נמצאת במקום העשרות.', `{{opener}} פותחת את {{drawerOf}} העשרות: יש בה 3 חבילות של 10, ${m('3 × 10 = 30')}.`],
             answer: 'המקום הוא <b>עשרות</b>, והערך הוא <b>30</b>.',
           },
           tryIt: lessonQ(qValueChoice('digitValue', 1, 473, 1), 'dv2', {
-            hint: 'התחילי מימין. הספרה הראשונה היא ספרת היחידות. באיזה מקום נמצאת הספרה 7?',
+            hint: 'מתחילים מימין. הספרה הראשונה היא ספרת היחידות. באיזה מקום נמצאת הספרה 7?',
             hintFigure: cargoBays(473, { highlight: 1, open: 1 }),
           }),
         },
@@ -139,7 +139,7 @@ export function buildLessons(): Record<TopicId, Lesson> {
             steps: [`מוסיפים 1: ${m('299 + 1')}.`, '9 יחידות ועוד 1 הן עשרת שלמה, ו־9 עשרות ועוד 1 הן מאה שלמה.'],
             answer: m('299 + 1 = 300'),
           },
-          tryIt: tq('prevNext', 'pn1', 'מה המספר <b>העוקב</b> של <b>4,099</b>?', [num(4100, 'הוסיפי 1. מה קורה כשיש 9 ביחידות ו־9 בעשרות?')],
+          tryIt: tq('prevNext', 'pn1', 'מה המספר <b>העוקב</b> של <b>4,099</b>?', [num(4100, 'מוסיפים 1. מה קורה כשיש 9 ביחידות ו־9 בעשרות?')],
             `העוקב גדול ב־1: ${m('4,099 + 1 = 4,100')}. היחידות והעשרות נהיות 0, והמאות גדלות ב־1.`),
         },
         {
@@ -150,7 +150,7 @@ export function buildLessons(): Record<TopicId, Lesson> {
             steps: [`מורידים 1: ${m(`600 ${MINUS} 1`)}.`, 'ממש לפני 600 בא 599 (סופרים אחורה: 601, 600, 599).'],
             answer: m(`600 ${MINUS} 1 = 599`),
           },
-          tryIt: tq('prevNext', 'pn2', 'מה המספר <b>הקודם</b> של <b>3,000</b>?', [num(2999, 'הורידי 1 מ־3,000. איזה מספר בא ממש לפני 3,000?')],
+          tryIt: tq('prevNext', 'pn2', 'מה המספר <b>הקודם</b> של <b>3,000</b>?', [num(2999, 'מורידים 1 מ־3,000. איזה מספר בא ממש לפני 3,000?')],
             `הקודם קטן ב־1: ${m(`3,000 ${MINUS} 1 = 2,999`)}.`),
         },
       ],
@@ -171,7 +171,7 @@ export function buildLessons(): Record<TopicId, Lesson> {
           },
           tryIt: (() => {
             const { choices, answer } = fixedChoices(textChoice('אי־זוגי'), [textChoice('זוגי')], 1);
-            return tq('evenOdd', 'eo1', 'האם המספר <b>2,583</b> זוגי או אי־זוגי?', [{ kind: 'choice', choices, answer, hint: 'הסתכלי רק על ספרת היחידות – הספרה הימנית ביותר. מה היא?' }],
+            return tq('evenOdd', 'eo1', 'האם המספר <b>2,583</b> זוגי או אי־זוגי?', [{ kind: 'choice', choices, answer, hint: 'מסתכלים רק על ספרת היחידות – הספרה הימנית ביותר. מה היא?' }],
               'ספרת היחידות היא 3. 3 אי־זוגי, ולכן 2,583 אי־זוגי.');
           })(),
         },
@@ -188,10 +188,10 @@ export function buildLessons(): Record<TopicId, Lesson> {
           example: {
             task: m(`4 ${X} 6 = ${BLANK}`),
             figure: bowlGroups(4, 6, { numbered: true }),
-            steps: [`הכלבלב שם 6 חטיפים בכל אחת מ־4 קערות: ${m('6 + 6 + 6 + 6')}.`, `או: ${m(`2 ${X} 6 = 12`)}, ופעמיים 12 זה 24.`],
+            steps: [`יש 4 {{bowls}}, ו{{sharer}} שם 6 {{items}} בכל {{bowl}}: ${m('6 + 6 + 6 + 6')}.`, `או: ${m(`2 ${X} 6 = 12`)}, ופעמיים 12 זה 24.`],
             answer: m(`4 ${X} 6 = 24`),
           },
-          tryIt: tq('multDiv', 'md1', 'פתרי את התרגיל.', [num(21, 'חברי 7 שלוש פעמים: 7 + 7 + 7.')],
+          tryIt: tq('multDiv', 'md1', 'פותרים את התרגיל.', [num(21, 'מחברים 7 שלוש פעמים: 7 + 7 + 7.')],
             `${m(`3 ${X} 7`)} = 3 פעמים 7: ${m('7 + 7 + 7 = 21')}.`, { math: `3 ${X} 7 = ${BLANK}` }),
         },
         {
@@ -200,10 +200,10 @@ export function buildLessons(): Record<TopicId, Lesson> {
           example: {
             task: m(`24 ${D} 6 = ${BLANK}`),
             figure: bowlGroups(6, 4, { numbered: true }),
-            steps: [`הכלבלב מחלק 24 חטיפים ל־6 קערות שווה בשווה. שואלים: ${m(`6 ${X} ${BLANK} = 24`)}.`, `${m(`6 ${X} 4 = 24`)} – בכל קערה 4 חטיפים.`],
+            steps: [`{{sharer}} מחלק 24 {{items}} ל־6 {{bowls}} שווה בשווה. שואלים: ${m(`6 ${X} ${BLANK} = 24`)}.`, `${m(`6 ${X} 4 = 24`)} – בכל {{bowl}} 4 {{items}}.`],
             answer: m(`24 ${D} 6 = 4`),
           },
-          tryIt: tq('multDiv', 'md2', 'פתרי את תרגיל החילוק.', [num(6, 'חשבי: 7 כפול כמה שווה 42?')],
+          tryIt: tq('multDiv', 'md2', 'פותרים את תרגיל החילוק.', [num(6, 'חושבים: 7 כפול כמה שווה 42?')],
             `${m(`7 ${X} 6 = 42`)}, לכן ${m(`42 ${D} 7 = 6`)}.`, { math: `42 ${D} 7 = ${BLANK}` }),
         },
       ],
@@ -221,7 +221,7 @@ export function buildLessons(): Record<TopicId, Lesson> {
             steps: ['שואלים: כמה פעמים 8 זה 56?', `${m(`7 ${X} 8 = 56`)} (או: ${m(`56 ${D} 8 = 7`)}).`],
             answer: 'המספר החסר הוא 7.',
           },
-          tryIt: tq('missing', 'ms1', 'איזה מספר חסר?', [num(9, 'ספרי בקפיצות של 6 עד 54: 6, 12, 18... כמה קפיצות?')],
+          tryIt: tq('missing', 'ms1', 'איזה מספר חסר?', [num(9, 'סופרים בקפיצות של 6 עד 54: 6, 12, 18... כמה קפיצות?')],
             `${m(`54 ${D} 6 = 9`)}. בדיקה: ${m(`6 ${X} 9 = 54`)}.`, { math: `6 ${X} ${BLANK} = 54` }),
         },
         {
@@ -251,7 +251,7 @@ export function buildLessons(): Record<TopicId, Lesson> {
             steps: [`בין 200 ל־300 יש 2 קפיצות (הקשתות). ${m(`100 ${D} 2 = 50`)} – כל קפיצה היא 50.`, `סימן השאלה נמצא 3 קפיצות אחרי 200: ${m('200 + 50 + 50 + 50')}.`],
             answer: 'התשובה: 350.',
           },
-          tryIt: tq('numberLine', 'nl1', 'איזה מספר מתאים לשנתה עם סימן השאלה?', [num(80, 'בין 30 ל־50 יש 2 קפיצות. כמה כל קפיצה? המשיכי לקפוץ עד סימן השאלה.')],
+          tryIt: tq('numberLine', 'nl1', 'איזה מספר מתאים לשנתה עם סימן השאלה?', [num(80, 'בין 30 ל־50 יש 2 קפיצות. כמה כל קפיצה? ממשיכים לקפוץ עד סימן השאלה.')],
             `${m(`50 ${MINUS} 30 = 20`)}, ובשתי קפיצות – כל קפיצה 10. סימן השאלה 5 קפיצות אחרי 30: ${m('30 + 50 = 80')}.`,
             { figure: numberLine({ start: 30, step: 10, count: 7, labeled: [0, 2], unknown: 5 }) }),
         },
@@ -266,12 +266,12 @@ export function buildLessons(): Record<TopicId, Lesson> {
           title: 'השלמת סדרה',
           explain: 'בודקים בכמה כל מספר גדל או קטן לעומת המספר שלפניו. ממשיכים באותו כלל עד המקום החסר.',
           example: {
-            task: 'השלימי את הסדרה היורדת:',
+            task: 'משלימים את הסדרה היורדת:',
             figure: sequenceFigure([75, 70, 65, 60, 55], 3, { steps: true, showAnswer: true }),
             steps: [`מ־75 ל־70 קטן ב־5, ומ־70 ל־65 גם קטן ב־5 (מסומן בין המספרים).`, `${m(`65 ${MINUS} 5 = 60`)}. בדיקה: ${m(`60 ${MINUS} 5 = 55`)} ✓`],
             answer: 'המספר החסר: 60.',
           },
-          tryIt: tq('sequences', 'sq1', 'השלימי את המספר החסר בסדרה העולה.', [num(280, 'בכמה גדל כל מספר? בדקי מ־240 ל־260.')],
+          tryIt: tq('sequences', 'sq1', 'משלימים את המספר החסר בסדרה העולה.', [num(280, 'בכמה גדל כל מספר? בודקים מ־240 ל־260.')],
             `בכל צעד המספר גדל ב־20. ${m('260 + 20 = 280')}, ובדיקה: ${m('280 + 20 = 300')}.`,
             { figure: sequenceFigure([240, 260, 280, 300, 320], 2) }),
         },
@@ -288,13 +288,13 @@ export function buildLessons(): Record<TopicId, Lesson> {
           example: {
             task: 'איזה תרגיל מתאים לציור?',
             figure: groupsFigure([4, 4, 4], { numbered: true, perLabel: true, item: 'treat' }),
-            steps: ['סופרים סלים: 3 קבוצות (המספר מעל כל סל).', 'בכל סל 4 חטיפים (המספר מתחת לכל סל).'],
+            steps: ['סופרים {{baskets}}: 3 קבוצות (המספר מעל כל {{basket}}).', 'בכל {{basket}} 4 {{items}} (המספר מתחת לכל {{basket}}).'],
             answer: `התרגיל: ${m(`3 ${X} 4 = 12`)}.`,
           },
           tryIt: (() => {
             const { choices, answer } = fixedChoices(mathChoice(`5 ${X} 2`), [mathChoice('5 + 2'), mathChoice(`2 ${X} 2`), mathChoice(`5 ${X} 5`)], 2);
-            return tq('multMeaning', 'mm1', 'איזה תרגיל מתאים לציור?', [{ kind: 'choice', choices, answer, hint: 'כמה סלים (קבוצות) יש? וכמה חטיפים בכל סל?' }],
-              `יש 5 קבוצות, ובכל אחת 2 חטיפים. התרגיל: ${m(`5 ${X} 2 = 10`)}.`,
+            return tq('multMeaning', 'mm1', 'איזה תרגיל מתאים לציור?', [{ kind: 'choice', choices, answer, hint: 'כמה {{baskets}} (קבוצות) יש? וכמה {{items}} בכל {{basket}}?' }],
+              `יש 5 קבוצות, ובכל אחת 2 {{items}}. התרגיל: ${m(`5 ${X} 2 = 10`)}.`,
               { figure: groupsFigure([2, 2, 2, 2, 2], { item: 'treat' }) });
           })(),
         },
@@ -317,7 +317,7 @@ export function buildLessons(): Record<TopicId, Lesson> {
             const { choices, answer } = fixedChoices(mathChoice(`28 ${D} 4`), [mathChoice(`28 ${MINUS} 4`), mathChoice(`28 ${X} 4`), mathChoice('28 + 4')], 0);
             return tq('wordProblems', 'wp1', '28 עוגיות חולקו שווה בשווה ל־4 ילדים. כמה עוגיות קיבל כל ילד?', [
               { kind: 'choice', prompt: 'איזה תרגיל פותר את הבעיה?', choices, answer, hint: 'המילים "שווה בשווה" רומזות על איזו פעולה?' },
-              num(7, 'חשבי: 4 כפול כמה שווה 28?', { prompt: 'מה התשובה?', suffix: 'עוגיות' }),
+              num(7, 'חושבים: 4 כפול כמה שווה 28?', { prompt: 'מה התשובה?', suffix: 'עוגיות' }),
             ], `מחלקים שווה בשווה ← חילוק: ${m(`28 ${D} 4 = 7`)}. כל ילד קיבל 7 עוגיות.`);
           })(),
         },
@@ -341,7 +341,7 @@ export function buildLessons(): Record<TopicId, Lesson> {
             const order = types;
             const correct = 'acute';
             const { choices, answer } = fixedChoices(textChoice(ANGLE_NAMES[correct]), order.filter((t) => t !== correct).map((t) => textChoice(ANGLE_NAMES[t])), order.indexOf(correct));
-            return tq('angles', 'an1', 'איזו זווית מסומנת בציור?', [{ kind: 'choice', choices, answer, hint: 'דמייני פינה של דף בקודקוד. האם הזווית צרה מהפינה, שווה לה, או רחבה ממנה?' }],
+            return tq('angles', 'an1', 'איזו זווית מסומנת בציור?', [{ kind: 'choice', choices, answer, hint: 'מדמיינים פינה של דף בקודקוד. האם הזווית צרה מהפינה, שווה לה, או רחבה ממנה?' }],
               'הזווית צרה מפינה של דף, ולכן היא <b>חדה</b>. גם כשהזווית מסובבת, סוג הזווית לא משתנה.',
               { figure: angleFigure({ deg: 45, rot: 200 }) });
           })(),
@@ -366,7 +366,7 @@ export function buildLessons(): Record<TopicId, Lesson> {
             const opts = sides.filter((s) => s !== 6).slice(0, 3);
             const all = [...opts, 6].sort((a, b) => a - b);
             const { choices, answer } = fixedChoices(textChoice(pn[6]), all.filter((s) => s !== 6).map((s) => textChoice(pn[s])), all.indexOf(6));
-            return tq('polygons', 'pg1', 'מה שם המצולע?', [{ kind: 'choice', choices, answer, hint: 'ספרי את הצלעות. התחילי מצלע אחת והמשיכי סביב הצורה עד שתחזרי אליה.' }],
+            return tq('polygons', 'pg1', 'מה שם המצולע?', [{ kind: 'choice', choices, answer, hint: 'סופרים את הצלעות. מתחילים מצלע אחת וממשיכים סביב הצורה עד שחוזרים אליה.' }],
               `יש 6 צלעות, ולכן זה <b>${pn[6]}</b>.`,
               { figure: polygonFigure(regularish(6, 90, 15, [1, 0.8, 0.95, 0.85, 1, 0.9])) });
           })(),
@@ -390,7 +390,7 @@ export function buildLessons(): Record<TopicId, Lesson> {
           tryIt: (() => {
             const opts = triangleOptions('scalene');
             const { choices, answer } = fixedChoices(textChoice(TRI_NAMES.scalene), opts.filter((o) => o !== 'scalene').map((o) => textChoice(TRI_NAMES[o])), opts.indexOf('scalene'));
-            return tq('triangles', 'tr1', 'איזה משולש זה? (אורכים בס״מ)', [{ kind: 'choice', choices, answer, hint: 'השווי את שלושת המספרים. האם יש שני אורכים זהים?' }],
+            return tq('triangles', 'tr1', 'איזה משולש זה? (אורכים בס״מ)', [{ kind: 'choice', choices, answer, hint: 'משווים את שלושת המספרים. האם יש שני אורכים זהים?' }],
               `האורכים 4, 6 ו־7 ס״מ – כולם שונים. לכן זה משולש <b>${TRI_NAMES.scalene}</b>.`,
               { figure: triangleFigure({ sides: [6, 7, 4], rot: 25, lengths: true, ticks: true }) });
           })(),

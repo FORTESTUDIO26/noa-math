@@ -97,20 +97,72 @@ function bunnyBody(mood: Mood, full: boolean): string {
 const BODIES: Record<Who, (m: Mood, full: boolean) => string> = { kitten: kittenBody, puppy: puppyBody, bunny: bunnyBody };
 const NAMES: Record<Who, string> = { kitten: 'חתלתולה עם סרט', puppy: 'כלבלב עם בנדנה', bunny: 'בובת ארנבת' };
 
-/** a friend as an <svg>. full = whole body, otherwise head (+ paw) only */
-export function friend(who: Who, mood: Mood = 'happy', size = 56, full = false): string {
-  return `<svg class="friend friend-${who} mood-${mood}" width="${size}" height="${size}" viewBox="-2 -2 84 84" aria-hidden="true" focusable="false">${extras(mood)}${BODIES[who](mood, full)}</svg>`;
+/* ------------------------------------------------------------- "כדורגל בחלל": astronauts in team kits */
+/** each club friend has a space-soccer counterpart in the same pose:
+ *  kitten → striker (#7, ponytail), puppy → goalkeeper (gloves), bunny → captain (armband) */
+const ROLE: Record<Who, { num: string; name: string }> = {
+  kitten: { num: '7', name: 'חלוצה אסטרונאוטית' },
+  puppy: { num: '1', name: 'שוער אסטרונאוט' },
+  bunny: { num: '10', name: 'קפטנית אסטרונאוטית' },
+};
+
+function astroBody(who: Who, mood: Mood, full: boolean): string {
+  const armUp = mood === 'cheer' || mood === 'wave';
+  const glove = who === 'puppy' ? 'as-glove' : 'as-hand';
+  const body = full
+    ? `<path d="M22 80 q-1 -22 18 -24 q19 2 18 24 z" class="as-suit"/>
+       <path d="M27 60 q13 -6 26 0 v12 q-13 4 -26 0 z" class="as-kit"/>
+       <path d="M27 64 h26" class="as-kit-stripe"/>
+       <text x="40" y="73" class="as-num">${ROLE[who].num}</text>
+       ${who === 'bunny' ? '<rect x="21" y="62" width="6" height="7" rx="1.5" class="as-band"/><text x="24" y="68" class="as-band-c">C</text>' : ''}
+       <rect x="28" y="76" width="9" height="5" rx="2" class="as-boot"/><rect x="43" y="76" width="9" height="5" rx="2" class="as-boot"/>
+       ${armUp ? '' : `<circle cx="22" cy="68" r="4.6" class="${glove}"/>`}`
+    : '';
+  const arm = armUp
+    ? `<g class="anim-paw"><path d="M56 60 q8 -8 8 -20" class="as-arm"/><circle cx="64" cy="38" r="5" class="${glove}"/></g>`
+    : full ? `<circle cx="58" cy="68" r="4.6" class="${glove}"/>` : '';
+  const ball = full && who === 'kitten'
+    ? `<g class="as-ballg"><path d="M60 78 q8 -6 16 -2" class="as-trail"/><circle cx="62" cy="77" r="5.5" class="as-ball"/><path d="M62 74.5 l2 1.5 l-0.8 2.4 h-2.4 l-0.8 -2.4 z" class="as-ball-patch"/></g>`
+    : '';
+  const ponytail = who === 'kitten' ? '<path d="M60 26 q12 4 8 18 q-6 -6 -10 -10 z" class="as-pony"/>' : '';
+  return `${body}${ponytail}
+    <line x1="52" y1="15" x2="57" y2="7" class="as-ant"/><circle cx="57.5" cy="6" r="2.6" class="as-ant-tip"/>
+    <circle cx="40" cy="36" r="25" class="as-helmet"/>
+    <ellipse cx="40" cy="38" rx="19" ry="16" class="as-visor"/>
+    <path d="M26 30 q4 -8 12 -9" class="as-glare"/>
+    ${who === 'bunny' ? '<path d="M30 25 q10 -5 20 0" class="as-cap"/>' : ''}
+    ${eyes(mood, 37, 8)}${blush(43, 12)}${mouth(mood, 45)}
+    ${arm}${ball}`;
 }
-/** the same drawing as a nested svg placed inside a bigger scene */
-export function friendAt(who: Who, mood: Mood, x: number, y: number, size: number, full = true): string {
-  return `<svg x="${x}" y="${y}" width="${size}" height="${size}" viewBox="-2 -2 84 84" class="friend friend-${who} mood-${mood}" aria-label="${NAMES[who]}" role="img">${extras(mood)}${BODIES[who](mood, full)}</svg>`;
+
+function astroSvg(who: Who, mood: Mood, size: number, full: boolean, cls = ''): string {
+  return `<svg class="astro astro-${who} mood-${mood} ${cls}" width="${size}" height="${size}" viewBox="-2 -2 84 84" aria-hidden="true" focusable="false">${extras(mood)}${astroBody(who, mood, full)}</svg>`;
+}
+function clubSvg(who: Who, mood: Mood, size: number, full: boolean, cls = ''): string {
+  return `<svg class="friend friend-${who} mood-${mood} ${cls}" width="${size}" height="${size}" viewBox="-2 -2 84 84" aria-hidden="true" focusable="false">${extras(mood)}${BODIES[who](mood, full)}</svg>`;
+}
+
+/** a friend (both looks; the current one is shown by CSS). full = whole body, otherwise head only */
+export function friend(who: Who, mood: Mood = 'happy', size = 56, full = false): string {
+  return `<span class="duo">${clubSvg(who, mood, size, full, 'th-club')}${astroSvg(who, mood, size, full, 'th-space')}</span>`;
+}
+/** nested drawing inside a bigger scene. theme = only that look (used in previews) */
+export function friendAt(who: Who, mood: Mood, x: number, y: number, size: number, full = true, theme?: 'club' | 'space'): string {
+  const club = `<svg x="${x}" y="${y}" width="${size}" height="${size}" viewBox="-2 -2 84 84" class="friend friend-${who} mood-${mood}${theme ? '' : ' th-club'}" aria-label="${NAMES[who]}" role="img">${extras(mood)}${BODIES[who](mood, full)}</svg>`;
+  const space = `<svg x="${x}" y="${y}" width="${size}" height="${size}" viewBox="-2 -2 84 84" class="astro astro-${who} mood-${mood}${theme ? '' : ' th-space'}" aria-label="${ROLE[who].name}" role="img">${extras(mood)}${astroBody(who, mood, full)}</svg>`;
+  return theme === 'club' ? club : theme === 'space' ? space : club + space;
+}
+
+/** a soccer ball centred at x,y */
+export function ball(x: number, y: number, r = 6): string {
+  return `<g class="sball" transform="translate(${x} ${y})"><circle r="${r}" class="as-ball"/><path d="M0 ${-r * 0.45} l${r * 0.42} ${r * 0.3} l${-r * 0.16} ${r * 0.5} h${-r * 0.52} l${-r * 0.16} ${-r * 0.5} z" class="as-ball-patch"/></g>`;
 }
 
 /* ------------------------------------------------------------- treats & bowls */
 
 /** a small bone-shaped treat centred at x,y (countable item) */
 export function treat(x: number, y: number): string {
-  return `<g class="treat" transform="translate(${x - 8} ${y - 4})"><rect x="3" y="2" width="10" height="4" rx="2"/><circle cx="3" cy="2" r="2.3"/><circle cx="3" cy="6" r="2.3"/><circle cx="13" cy="2" r="2.3"/><circle cx="13" cy="6" r="2.3"/></g>`;
+  return `<g class="treat th-club" transform="translate(${x - 8} ${y - 4})"><rect x="3" y="2" width="10" height="4" rx="2"/><circle cx="3" cy="2" r="2.3"/><circle cx="3" cy="6" r="2.3"/><circle cx="13" cy="2" r="2.3"/><circle cx="13" cy="6" r="2.3"/></g><g class="th-space">${ball(x, y, 6)}</g>`;
 }
 
 /**
@@ -137,10 +189,11 @@ export function bowlGroups(groups: number, per: number, opts: { size?: 'normal' 
       b += treat(left + 7 + c * cw + cw / 2 - 2, gy + 6 + r * ch);
     }
     const by = gy + treatsH;
-    b += `<path d="M${left} ${by} h${bw} q-2 ${bowlH} -${bw / 2} ${bowlH} q-${bw / 2 - 2} 0 -${bw / 2} -${bowlH} z" class="bowl"/><path d="M${left + 4} ${by + 5} h${bw - 8}" class="bowl-band"/>`;
+    b += `<g class="th-club"><path d="M${left} ${by} h${bw} q-2 ${bowlH} -${bw / 2} ${bowlH} q-${bw / 2 - 2} 0 -${bw / 2} -${bowlH} z" class="bowl"/><path d="M${left + 4} ${by + 5} h${bw - 8}" class="bowl-band"/></g>`;
+    b += `<g class="th-space"><path d="M${left + 2} ${by - 2} q${bw / 2 - 2} ${bowlH + 6} ${bw - 4} 0" class="net"/><path d="M${left + 8} ${by + 2} l${bw / 2 - 8} ${bowlH - 4} M${left + bw - 8} ${by + 2} l${-(bw / 2 - 8)} ${bowlH - 4}" class="net-line"/></g>`;
     if (opts.numbered) b += `<text x="${gx + gw / 2}" y="${by + bowlH + 13}" class="grp-count">${per}</text>`;
   }
-  const svg = `<svg class="fig ${opts.size === 'small' ? 'fig-small' : ''}" viewBox="0 0 ${W} ${H}" direction="ltr" role="img" aria-label="${groups} קערות, בכל קערה ${per} חטיפים" xmlns="http://www.w3.org/2000/svg">${b}</svg>`;
+  const svg = `<svg class="fig ${opts.size === 'small' ? 'fig-small' : ''}" viewBox="0 0 ${W} ${H}" direction="ltr" role="img" aria-label="${groups} {{bowls}}, בכל {{bowl}} ${per} {{items}}" xmlns="http://www.w3.org/2000/svg">${b}</svg>`;
   return `<div class="share">${friend('puppy', 'happy', 46, true)}${svg}</div>`;
 }
 
@@ -172,13 +225,13 @@ export function drawers(n: number, o: DrawerOpts = {}): string {
     const cls = `bay${hi ? ' bay-hi' : ''}${open ? ' bay-open' : ''}`;
     const inner = `<span class="bay-name">${placeName(p)}</span><span class="bay-digit">${d}</span>${hi ? '<span class="bay-arrow" aria-hidden="true">▲</span>' : ''}<span class="bay-knob" aria-hidden="true"></span>`;
     out += o.interactive
-      ? `<button type="button" class="${cls}" data-act="bay" data-digit="${d}" data-place="${p}" aria-pressed="${open}" aria-label="מגירת ה${placeName(p)}: ${d}">${inner}</button>`
+      ? `<button type="button" class="${cls}" data-act="bay" data-digit="${d}" data-place="${p}" aria-pressed="${open}" aria-label="{{drawerOf}} ה${placeName(p)}: ${d}">${inner}</button>`
       : `<div class="${cls}">${inner}</div>`;
   }
   const panel = o.open !== undefined
     ? packs(ds[o.open] ?? 0, o.open)
-    : o.interactive ? `<div class="packs-prompt">${o.prompt ?? 'לחצי על מגירה כדי לפתוח אותה'}</div>` : '';
-  return `<div class="cargo"${o.id ? ` data-cargo-id="${o.id}"` : ''}><div class="ship chest" aria-label="שידת המגירות של הארנבת"><div class="bays" dir="ltr">${out}</div></div>${panel || o.interactive ? `<div class="bay-packs" aria-live="polite">${panel}</div>` : ''}</div>`;
+    : o.interactive ? `<div class="packs-prompt">${o.prompt ?? 'לוחצים על {{drawer}} כדי לפתוח אותה'}</div>` : '';
+  return `<div class="cargo"${o.id ? ` data-cargo-id="${o.id}"` : ''}><div class="ship chest" aria-label="{{drawers}}: {{chest}}"><div class="bays" dir="ltr">${out}</div></div>${panel || o.interactive ? `<div class="bay-packs" aria-live="polite">${panel}</div>` : ''}</div>`;
 }
 /** kept name for older imports */
 export const cargoBays = drawers;
@@ -186,7 +239,7 @@ export const cargoBays = drawers;
 /** what is inside an open drawer: d packs of 10^p */
 export function packs(d: number, p: number): string {
   const unit = 10 ** p;
-  if (d === 0) return `<div class="packs-caption">${friend('bunny', 'oops', 34)}<span>המגירה ריקה: 0 ${placeName(p)}. הערך הוא ${m('0')}.</span></div>`;
+  if (d === 0) return `<div class="packs-caption">${friend('bunny', 'oops', 34)}<span>{{theDrawer}} ריקה: 0 ${placeName(p)}. הערך הוא ${m('0')}.</span></div>`;
   const one = (k: number) => {
     if (p === 0) return `<svg class="pk pk-1" viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" rx="3" class="pk-cube"/></svg>`;
     if (p === 1) {

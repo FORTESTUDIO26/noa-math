@@ -30,7 +30,7 @@ export function prevNext(rng: Rng, level: Level): Question {
       return {
         topic, level, sig: `pn-between-${mid}`,
         prompt: `איזה מספר נמצא בדיוק בין <b>${fmt(mid - 1)}</b> ל־<b>${fmt(mid + 1)}</b>?`,
-        parts: [num(mid, `זה המספר העוקב של ${fmt(mid - 1)}. הוסיפי 1.`)],
+        parts: [num(mid, `זה המספר העוקב של ${fmt(mid - 1)}. מוסיפים 1.`)],
         explanation: `${m(`${fmt(mid - 1)} + 1 = ${fmt(mid)}`)} וגם ${m(`${fmt(mid + 1)} ${MINUS} 1 = ${fmt(mid)}`)}. לכן המספר הוא ${m(fmt(mid))}.`,
       };
     }
@@ -41,7 +41,7 @@ export function prevNext(rng: Rng, level: Level): Question {
   return {
     topic, level, sig: `pn-${isNext ? 'n' : 'p'}-${n}`,
     prompt: isNext ? `מה המספר <b>העוקב</b> של <b>${fmt(n)}</b>?` : `מה המספר <b>הקודם</b> של <b>${fmt(n)}</b>?`,
-    parts: [num(ans, isNext ? 'המספר העוקב גדול ב־1. הוסיפי 1 – ושימי לב למעבר עשרת או מאה.' : 'המספר הקודם קטן ב־1. הורידי 1 – ושימי לב למעבר עשרת או מאה.')],
+    parts: [num(ans, isNext ? 'המספר העוקב גדול ב־1. מוסיפים 1 – ושימו לב למעבר עשרת או מאה.' : 'המספר הקודם קטן ב־1. מורידים 1 – ושימו לב למעבר עשרת או מאה.')],
     explanation: isNext
       ? `העוקב גדול ב־1: ${m(`${fmt(n)} + 1 = ${fmt(ans)}`)}.`
       : `הקודם קטן ב־1: ${m(`${fmt(n)} ${MINUS} 1 = ${fmt(ans)}`)}.`,
@@ -54,7 +54,7 @@ const EVEN = 'זוגי', ODD = 'אי־זוגי';
 
 export function evenOdd(rng: Rng, level: Level): Question {
   const topic = 'evenOdd' as const;
-  const hint = 'הסתכלי רק על ספרת היחידות – הספרה הימנית. אם היא 0, 2, 4, 6 או 8 – המספר זוגי.';
+  const hint = 'מסתכלים רק על ספרת היחידות – הספרה הימנית. אם היא 0, 2, 4, 6 או 8 – המספר זוגי.';
   if (level === 1) {
     const n = rng.int(11, 999);
     const even = n % 2 === 0;
@@ -78,7 +78,7 @@ export function evenOdd(rng: Rng, level: Level): Question {
     const { choices, answer } = makeChoices(rng, mathChoice(fmt(right)), [...wrong].map((w) => mathChoice(fmt(w))));
     return {
       topic, level, sig: `eo-pick-${right}`,
-      prompt: `בחרי את המספר ה<b>${wantEven ? EVEN : ODD}</b>.`,
+      prompt: `יש לבחור את המספר ה<b>${wantEven ? EVEN : ODD}</b>.`,
       parts: [{ kind: 'choice', choices, answer, hint }],
       explanation: `בודקים רק את ספרת היחידות. ב־${m(fmt(right))} ספרת היחידות היא ${right % 10}, ולכן הוא ${wantEven ? EVEN : ODD}. בשאר המספרים ספרת היחידות ${wantEven ? 'אי־זוגית' : 'זוגית'}.`,
     };
@@ -103,7 +103,7 @@ export function multDiv(rng: Rng, level: Level): Question {
     if (rng.bool(0.7)) {
       return {
         topic, level, sig: `md-m-${a}x${b}`,
-        prompt: 'פתרי את התרגיל.',
+        prompt: 'יש לפתור את התרגיל.',
         math: `${a} ${X} ${b} = ${BLANK}`,
         parts: [num(a * b, `${a} ${X} ${b} זה ${a} פעמים ${b}. אפשר לחבר: ${Array(a).fill(b).join(' + ')}.`)],
         hintFigure: a <= 6 && b <= 9 ? bowlGroups(a, b) : undefined,
@@ -118,9 +118,9 @@ export function multDiv(rng: Rng, level: Level): Question {
       const [p, q] = rng.bool() ? [a, b] : [b, a];
       return {
         topic, level, sig: `md-m-${p}x${q}`,
-        prompt: 'פתרי את התרגיל.',
+        prompt: 'יש לפתור את התרגיל.',
         math: `${p} ${X} ${q} = ${BLANK}`,
-        parts: [num(p * q, `היעזרי בתרגיל שאת יודעת: ${p} ${X} ${q - 1} = ${p * (q - 1)}. כמה צריך להוסיף?`)],
+        parts: [num(p * q, `נעזרים בתרגיל שאת יודעת: ${p} ${X} ${q - 1} = ${p * (q - 1)}. כמה צריך להוסיף?`)],
         explanation: `${m(`${p} ${X} ${q - 1} = ${p * (q - 1)}`)}, ועוד ${p} אחד: ${m(`${p * (q - 1)} + ${p} = ${p * q}`)}. לכן ${m(`${p} ${X} ${q} = ${p * q}`)}.`,
       };
     }
@@ -132,7 +132,7 @@ export function multDiv(rng: Rng, level: Level): Question {
     const [x, y] = rng.bool() ? [a, b] : [b, a];
     return {
       topic, level, sig: `md-fam-${x}-${y}`,
-      prompt: `היעזרי בתרגיל הכפל ${m(`${a} ${X} ${b} = ${c}`)} והשלימי את תרגיל החילוק.`,
+      prompt: `נעזרים בתרגיל הכפל ${m(`${a} ${X} ${b} = ${c}`)} ומשלימים את תרגיל החילוק.`,
       math: `${c} ${D} ${x} = ${BLANK}`,
       parts: [num(y, `בתרגיל הכפל ${a} ${X} ${b} = ${c}. ${x} כפול כמה שווה ${c}?`)],
       explanation: `חילוק הוא הפעולה ההפוכה לכפל. ${m(`${x} ${X} ${y} = ${c}`)}, לכן ${m(`${c} ${D} ${x} = ${y}`)}.`,
@@ -165,9 +165,9 @@ function divQ(rng: Rng, level: Level, divisor: number, quotient: number): Questi
   const c = d * quotient;
   return {
     topic: 'multDiv', level, sig: `md-d-${c}:${d}`,
-    prompt: 'פתרי את תרגיל החילוק.',
+    prompt: 'יש לפתור את תרגיל החילוק.',
     math: `${c} ${D} ${d} = ${BLANK}`,
-    parts: [num(quotient, `חשבי בכפל: ${d} כפול כמה שווה ${c}?`)],
+    parts: [num(quotient, `חושבים בכפל: ${d} כפול כמה שווה ${c}?`)],
     hintFigure: d <= 6 && quotient <= 9 ? bowlGroups(d, quotient) : undefined,
     explanation: `שואלים: ${m(`${d} ${X} ${BLANK} = ${c}`)}. ${m(`${d} ${X} ${quotient} = ${c}`)}, לכן ${m(`${c} ${D} ${d} = ${quotient}`)}.`,
   };
@@ -205,14 +205,14 @@ export function missing(rng: Rng, level: Level): Question {
       return {
         topic, level, sig: `ms-dvd-${a}-${b}`,
         prompt: 'איזה מספר חסר?', math: `${BLANK} ${D} ${a} = ${b}`,
-        parts: [num(c, `המספר החסר הוא המספר שמחלקים. כפלי: ${a} ${X} ${b}.`)],
+        parts: [num(c, `המספר החסר הוא המספר שמחלקים. כופלים: ${a} ${X} ${b}.`)],
         explanation: `חילוק הפוך לכפל: ${m(`${a} ${X} ${b} = ${c}`)}, לכן ${m(`${c} ${D} ${a} = ${b}`)}.`,
       };
     case 'divisor': {
       return {
         topic, level, sig: `ms-dvs-${a}-${b}`,
         prompt: 'איזה מספר חסר?', math: `${c} ${D} ${BLANK} = ${b}`,
-        parts: [num(a, `באיזה מספר מחלקים את ${c} כדי לקבל ${b}? חשבי: ${BLANK} ${X} ${b} = ${c}.`)],
+        parts: [num(a, `באיזה מספר מחלקים את ${c} כדי לקבל ${b}? חושבים: ${BLANK} ${X} ${b} = ${c}.`)],
         explanation: `מחפשים מספר שכשכופלים אותו ב־${b} מקבלים ${c}: ${m(`${a} ${X} ${b} = ${c}`)}. לכן ${m(`${c} ${D} ${a} = ${b}`)}.`,
       };
     }
@@ -239,7 +239,7 @@ export function missing(rng: Rng, level: Level): Question {
       return {
         topic, level, sig: `ms-addB-${x}-${total}`,
         prompt: 'איזה מספר חסר?', math: `${BLANK} + ${fmt(x)} = ${fmt(total)}`,
-        parts: [num(total - x, `כמה צריך להוסיף ל־${fmt(x)} כדי להגיע ל־${fmt(total)}? חסרי: ${fmt(total)} ${MINUS} ${fmt(x)}.`)],
+        parts: [num(total - x, `כמה צריך להוסיף ל־${fmt(x)} כדי להגיע ל־${fmt(total)}? מחסרים: ${fmt(total)} ${MINUS} ${fmt(x)}.`)],
         explanation: `${m(`${fmt(total)} ${MINUS} ${fmt(x)} = ${fmt(total - x)}`)}. בדיקה: ${m(`${fmt(total - x)} + ${fmt(x)} = ${fmt(total)}`)}.`,
       };
     }
@@ -278,7 +278,7 @@ export function numberLineQ(rng: Rng, level: Level): Question {
     prompt: 'איזה מספר מתאים לשנתה עם סימן השאלה?',
     figure: numberLine({ start, step, count, labeled, unknown }),
     parts: [num(ans, jumps === 1
-      ? 'בדקי בכמה המספרים גדלים בין שתי שנתות.'
+      ? 'בודקים בכמה המספרים גדלים בין שתי שנתות.'
       : `בין ${fmt(val(i0))} ל־${fmt(val(i1))} יש ${jumps} קפיצות. בכמה גדל המספר בכל קפיצה?`)],
     explanation: `בין ${m(fmt(val(i0)))} ל־${m(fmt(val(i1)))} יש ${jumps === 1 ? 'קפיצה אחת' : `${jumps} קפיצות`}: ${jumps === 1 ? m(`${fmt(val(i1))} ${MINUS} ${fmt(val(i0))} = ${fmt(step)}`) : m(`(${fmt(val(i1))} ${MINUS} ${fmt(val(i0))}) ${D} ${jumps} = ${fmt(step)}`)}, כלומר כל קפיצה היא ${m(fmt(step))}. ` +
       (dist >= 0
@@ -306,9 +306,9 @@ export function sequences(rng: Rng, level: Level): Question {
   const ref = blank === 0 ? 1 : 0;
   return {
     topic, level, sig: `sq-${terms.join('_')}-${blank}`,
-    prompt: `השלימי את המספר החסר בסדרה ה${up ? 'עולה' : 'יורדת'}.`,
+    prompt: `יש להשלים את המספר החסר בסדרה ה${up ? 'עולה' : 'יורדת'}.`,
     figure: sequenceFigure(terms, blank),
-    parts: [num(ans, `בדקי בכמה המספרים ${up ? 'גדלים' : 'קטנים'}: מ־${fmt(terms[ref])} ל־${fmt(terms[ref + 1 === blank ? ref + 2 : ref + 1])}.`)],
+    parts: [num(ans, `בודקים בכמה המספרים ${up ? 'גדלים' : 'קטנים'}: מ־${fmt(terms[ref])} ל־${fmt(terms[ref + 1 === blank ? ref + 2 : ref + 1])}.`)],
     explanation: `בכל צעד המספר ${up ? 'גדל' : 'קטן'} ב־${m(fmt(step))}. ` +
       (blank === 0
         ? `המספר הראשון ${up ? 'קטן' : 'גדול'} ב־${fmt(step)} מ־${m(fmt(terms[1]))}: ${m(`${fmt(terms[1])} ${up ? MINUS : '+'} ${fmt(step)} = ${fmt(ans)}`)}.`
@@ -319,7 +319,7 @@ export function sequences(rng: Rng, level: Level): Question {
 /* ============================================================ משמעות הכפל */
 
 const ITEMS = [
-  { one: 'חטיפים', fig: 'treat' as const },
+  { one: '{{items}}', fig: 'treat' as const },
 ];
 
 export function multMeaning(rng: Rng, level: Level): Question {
@@ -329,11 +329,11 @@ export function multMeaning(rng: Rng, level: Level): Question {
   if (level === 1) {
     return {
       topic, level, sig: `mm-count-${g}-${p}`,
-      prompt: 'הסתכלי על הציור והשיבי על השאלות.',
+      prompt: 'יש להסתכל על הציור ולענות על השאלות.',
       figure: groupsFigure(Array(g).fill(p), { item: it.fig }),
       parts: [
-        num(g, 'ספרי את המסגרות. כל מסגרת היא קבוצה.', { prompt: 'כמה קבוצות יש?' }),
-        num(p, 'בחרי קבוצה אחת וספרי את מה שיש בתוכה.', { prompt: `כמה ${it.one} יש בכל קבוצה?` }),
+        num(g, 'סופרים את המסגרות. כל מסגרת היא קבוצה.', { prompt: 'כמה קבוצות יש?' }),
+        num(p, 'בוחרים קבוצה אחת וסופרים את מה שיש בתוכה.', { prompt: `כמה ${it.one} יש בכל קבוצה?` }),
         num(g * p, `יש ${g} קבוצות של ${p}. ${g} ${X} ${p} = ?`, { prompt: `כמה ${it.one} יש בסך הכל?` }),
       ],
       explanation: `יש ${g} קבוצות, ובכל קבוצה ${p} ${it.one}. התרגיל: ${m(`${g} ${X} ${p} = ${g * p}`)}.`,
@@ -373,7 +373,7 @@ export function multMeaning(rng: Rng, level: Level): Question {
   return {
     topic, level, sig: `mm-pic-${g}-${p}`,
     prompt: `איזה ציור מתאים לתרגיל ${m(`${g} ${X} ${p}`)}?`,
-    parts: [{ kind: 'choice', choices, answer, hint: `צריך ${g} קבוצות שוות, ובכל קבוצה בדיוק ${p}. בדקי גם שכל הקבוצות שוות.` }],
+    parts: [{ kind: 'choice', choices, answer, hint: `צריך ${g} קבוצות שוות, ובכל קבוצה בדיוק ${p}. בודקים גם שכל הקבוצות שוות.` }],
     explanation: `${m(`${g} ${X} ${p}`)} פירושו ${g} קבוצות שוות של ${p}. בציור הנכון יש ${g} מסגרות, ובכל אחת ${p}.`,
   };
 }
@@ -438,7 +438,7 @@ export function wordProblems(rng: Rng, level: Level): Question {
     prompt: w.text,
     parts: [
       { kind: 'choice', prompt: 'איזה תרגיל פותר את הבעיה?', choices, answer, hint: 'מה קורה בסיפור? מוסיפים, לוקחים, יש קבוצות שוות, או מחלקים שווה בשווה?' },
-      num(ans, `פתרי את התרגיל ${expr(w.op)}.`, { prompt: 'מה התשובה?', suffix: w.unit }),
+      num(ans, `פותרים את התרגיל ${expr(w.op)}.`, { prompt: 'מה התשובה?', suffix: w.unit }),
     ],
     explanation: `${w.why} התרגיל: ${m(`${expr(w.op)} = ${fmt(ans)}`)}. התשובה: ${fmt(ans)} ${w.unit}.`,
   };
