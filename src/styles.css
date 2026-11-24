@@ -594,3 +594,23 @@ h1, h2, .app-title, .lesson-title, .skill-title, .big-score, .group-title, .top-
 .theme-name small { color: var(--ink-2); font-size: .8rem; }
 .theme-mark { align-self: center; font-size: .8rem; font-weight: 700; padding: 1px 10px; border-radius: 99px; border: 2px solid var(--berry); color: var(--berry-dark); }
 .theme-opt.on .theme-mark { background: var(--berry); color: #fff; }
+
+/* ================================================================== no phone keyboard */
+.fbox { flex: 0 0 64px; width: 64px; height: 54px; display: inline-flex; align-items: center; justify-content: center; font: 700 1.6rem var(--font); color: var(--ink); background: #fff; border: 3px solid var(--line); border-radius: 14px; cursor: pointer; padding: 0; }
+.fbox.on { border-color: var(--berry); box-shadow: 0 0 0 3px var(--pink-soft); }
+.fbox.on:empty::after { content: "|"; color: var(--berry); font-weight: 400; animation: blink 1s steps(2) infinite; }
+.fbox-done { cursor: default; background: var(--cream); }
+@keyframes blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .fbox.on:empty::after { animation: none; } }
+.pad-label { margin-top: 4px; font-size: .9rem; color: var(--ink-2); }
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 300px; margin: 6px auto 0; }
+.kp { min-height: 52px; border-radius: 14px; border: 2px solid var(--line); background: var(--paper); font: 700 1.4rem var(--font); color: var(--ink); cursor: pointer; box-shadow: 0 3px 0 var(--line); }
+.kp:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--line); }
+.kp-del, .kp-next { font-size: 1.2rem; background: var(--sand); }
+.choice-suffix { font-size: .9rem; font-weight: 500; color: var(--ink-2); }
+.name-row { display: flex; align-items: center; gap: 8px; }
+.name-box { flex: 1; min-height: 52px; display: flex; align-items: center; padding: 6px 14px; border: 3px solid var(--line); border-radius: 14px; background: #fff; font: 500 1.2rem var(--font); }
+.name-box.empty { color: var(--ink-2); font-size: 1rem; }
+.letters { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+.lt { min-height: 44px; border-radius: 10px; border: 2px solid var(--line); background: var(--paper); font: 600 1.15rem var(--font); color: var(--ink); cursor: pointer; padding: 0; }
+.lt-wide { grid-column: span 3; font-size: .95rem; background: var(--sand); }

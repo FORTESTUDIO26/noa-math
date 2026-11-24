@@ -9,6 +9,7 @@ import { checkPart, splitFields, isFilled } from './answers';
 import { friend, packs } from './club';
 import { topicIcon, modeIcon, homeScene, puzzleIcon, clubScene, spaceScene } from './art';
 import { THEMES, themeText, type ThemeId } from './theme';
+import { numbersToChoices } from './choices';
 
 /* ================================================================== state */
 
@@ -50,6 +51,18 @@ function load(): AppState {
     const st = { ...fresh(), ...s };
     // children who already practised keep their progress and get "מועדון החיות" by default
     if (!st.profile) st.profile = { name: '', theme: 'club' };
+    // rounds saved by an older version could still ask to type a number – turn them into buttons
+    if (st.practice) st.practice.questions = st.practice.questions.map(numbersToChoices);
+    if (st.exam) {
+      const old = st.exam.questions;
+      st.exam.questions = old.map(numbersToChoices);
+      st.exam.answers = st.exam.answers.map((ans, qi) => ans.map((v, pi) => {
+        const was = old[qi].parts[pi], now = st.exam!.questions[qi].parts[pi];
+        if (was.kind !== 'number' || now.kind !== 'choice') return v;
+        const hit = now.choices!.find((c) => c.text.replace(/,/g, '') === v.replace(/[,\s]/g, ''));
+        return hit ? hit.id : '';
+      }));
+    }
     return st;
   } catch { return fresh(); }
 }
@@ -120,9 +133,9 @@ function answer(key: string, partIdx: number, value: string) {
   if (pp.status !== 'open') return;
   const res = checkPart(part, value);
   if (part.kind === 'fields') pp.values = splitFields(value, part.fields!.length);
-  const firstField = `[data-field="${key}-${partIdx}-0"]`;
+  const group = `P|${key}|${partIdx}`;
   if (res.empty) {
-    focusSel = part.kind === 'fields' ? firstField : `[data-input="${key}-${partIdx}"]`;
+    if (part.kind === 'fields') activeBox.set(group, 0); else focusSel = `[data-input="${key}-${partIdx}"]`;
     pp.hintText = part.kind === 'fields' ? 'ממלאים ספרה בכל אחת מארבע השורות ואז לוחצים על ״בדיקה״.' : pp.hintText;
     save(); render(); return;
   }
@@ -137,12 +150,12 @@ function answer(key: string, partIdx: number, value: string) {
     if (pp.attempts >= 2) pp.status = 'failed';
     else if (part.kind === 'fields') {
       const i = (res.bad ?? []).findIndex(Boolean);
-      focusSel = `[data-field="${key}-${partIdx}-${Math.max(0, i)}"]`;
+      activeBox.set(group, Math.max(0, i));
     } else focusSel = `[data-input="${key}-${partIdx}"]`;
   }
   // next part gets focus
   const next = r.q.parts[partIdx + 1];
-  if (pp.status !== 'open' && next && next.kind !== 'choice') focusSel = next.kind === 'fields' ? `[data-field="${key}-${partIdx + 1}-0"]` : `[data-input="${key}-${partIdx + 1}"]`;
+  if (pp.status !== 'open' && next && next.kind !== 'choice' && next.kind !== 'fields') focusSel = `[data-input="${key}-${partIdx + 1}"]`;
   if (key === 'P' && r.prog.every((p) => p.status !== 'open')) countStats();
   save();
   render();
@@ -208,12 +221,24 @@ function answerBox(part: Part, attrs: string, value = ''): string {
   return `<div class="answer-box"><div class="num-form-row"><input class="num-input${kind === 'text' ? ' text-input' : ''}" ${inputAttrs(kind)} ${attrs} enterkeyhint="done" autocomplete="off" aria-label="התשובה שלך" ${part.fieldHint ? `aria-describedby="fh-${esc(hintId)}"` : ''} value="${esc(value)}" />${part.suffix ? `<span class="suffix">${part.suffix}</span>` : ''}</div>${part.fieldHint ? `<div class="field-hint" id="fh-${esc(hintId)}">${part.fieldHint}</div>` : ''}</div>`;
 }
 
+/** which box of a decomposition is being filled (group → index) – no phone keyboard is used */
+const activeBox = new Map<string, number>();
+function activeIndex(group: string, values: string[], n: number): number {
+  const a = activeBox.get(group);
+  if (a !== undefined && a < n) return a;
+  const firstEmpty = Array.from({ length: n }, (_, i) => i).find((i) => !(values[i] ?? '').trim());
+  return firstEmpty ?? 0;
+}
+
 /**
- * notebook rows: [ box ] label — box first, in Hebrew reading order.
+ * notebook rows: [ box ] label — box first, in Hebrew reading order. Boxes are filled with the
+ * on-screen digit pad below them (no phone keyboard).
  * An empty box and a wrong digit are two different states with their own message.
  */
-function fieldRows(part: Part, values: string[], attr: (i: number) => string, st: { bad?: boolean[]; locked?: boolean; reveal?: boolean } = {}): string {
-  return `<div class="frows">${part.fields!.map((f, i) => {
+function fieldRows(part: Part, values: string[], group: string | null, st: { bad?: boolean[]; locked?: boolean; reveal?: boolean } = {}): string {
+  const n = part.fields!.length;
+  const act = group ? activeIndex(group, values, n) : -1;
+  const rows = part.fields!.map((f, i) => {
     const bad = st.bad?.[i];
     const typed = values[i] ?? '';
     const v = st.reveal && bad ? f.answer : typed;
@@ -221,8 +246,19 @@ function fieldRows(part: Part, values: string[], attr: (i: number) => string, st
     if (st.locked) mark = bad ? `<span class="fmark fmark-bad">✗ התשובה: ${esc(f.answer)}</span>` : '<span class="fmark fmark-ok">✓ נכון</span>';
     else if (bad) mark = typed.trim() === '' ? '<span class="fmark fmark-empty">○ השורה ריקה</span>' : '<span class="fmark fmark-bad">✗ לתיקון</span>';
     const cls = bad ? (typed.trim() === '' && !st.locked ? ' frow-empty' : ' frow-bad') : st.locked ? ' frow-ok' : '';
-    return `<div class="frow${cls}"><input class="num-input field-input" ${inputAttrs('number')} ${attr(i)} enterkeyhint="${i < part.fields!.length - 1 ? 'next' : 'done'}" autocomplete="off" aria-label="${f.label}" value="${esc(v)}" ${st.locked ? 'readonly' : ''} /><span class="flabel">${f.label}</span>${mark}</div>`;
-  }).join('')}</div>`;
+    const box = group
+      ? `<button type="button" class="fbox${i === act ? ' on' : ''}" data-act="fbox" data-group="${group}" data-i="${i}" data-field="${group}-${i}" aria-pressed="${i === act}" aria-label="${f.label}: ${v === '' ? 'ריק' : v}">${esc(v)}</button>`
+      : `<span class="fbox fbox-done" data-field-done="${i}">${esc(v)}</span>`;
+    return `<div class="frow${cls}">${box}<span class="flabel">${f.label}</span>${mark}</div>`;
+  }).join('');
+  return `<div class="frows">${rows}</div>${group ? digitPad(group, part.fields![act]?.label ?? '') : ''}`;
+}
+
+/** on-screen digits (instead of the phone keyboard) */
+function digitPad(group: string, label: string): string {
+  const k = (d: string) => `<button type="button" class="kp" data-act="kp" data-group="${group}" data-d="${d}">${d}</button>`;
+  return `<div class="pad-label">ספרה לשורת ה<b>${label}</b>:</div>
+  <div class="keypad" dir="ltr" role="group" aria-label="ספרות">${['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(k).join('')}<button type="button" class="kp kp-del" data-act="kp-del" data-group="${group}" aria-label="מחיקת הספרה">⌫</button>${k('0')}<button type="button" class="kp kp-next" data-act="kp-next" data-group="${group}" aria-label="לשורה הבאה">⬇</button></div>`;
 }
 
 function feedbackGood(first: boolean, seed: string): string {
@@ -252,9 +288,9 @@ function renderRunner(q: Question, prog: PartProg[], key: string): string {
     } else if (part.kind === 'fields') {
       const vals = pp.values ?? part.fields!.map(() => '');
       if (pp.status === 'open') {
-        h += `<form class="fields-form" data-key="${key}" data-part="${pi}" autocomplete="off">${fieldRows(part, vals, (i) => `data-field="${key}-${pi}-${i}"`, { bad: pp.bad })}${part.fieldHint ? `<div class="field-hint">${part.fieldHint}</div>` : ''}<button type="submit" class="btn btn-primary btn-wide">בדיקה</button></form>`;
+        h += `<form class="fields-form" data-key="${key}" data-part="${pi}" autocomplete="off">${fieldRows(part, vals, `P|${key}|${pi}`, { bad: pp.bad })}${part.fieldHint ? `<div class="field-hint">${part.fieldHint}</div>` : ''}<button type="submit" class="btn btn-primary btn-wide">בדיקה</button></form>`;
       } else {
-        h += fieldRows(part, vals, (i) => `data-field-done="${i}"`, { bad: pp.status === 'failed' ? pp.bad : part.fields!.map(() => false), locked: true, reveal: pp.status === 'failed' });
+        h += fieldRows(part, vals, null, { bad: pp.status === 'failed' ? pp.bad : part.fields!.map(() => false), locked: true, reveal: pp.status === 'failed' });
       }
     } else {
       h += `<div class="${choiceGridClass(q, pi)}" role="group" aria-label="אפשרויות תשובה">`;
@@ -344,8 +380,12 @@ function welcomeView(edit: boolean): string {
     <h1 class="app-title">המתמטיקה של נועה</h1>
     <p class="lead">תרגול מתמטיקה לכיתה ג׳ – הסבר קצר, דוגמה ותרגול.</p>
     <form class="welcome-form" data-form="welcome" autocomplete="off">
-      <label class="field-label" for="kid-name">מה השם שלך? <small>(לא חובה)</small></label>
-      <input id="kid-name" class="name-input" type="text" inputmode="text" lang="he" dir="rtl" maxlength="20" autocomplete="off" autocapitalize="words" spellcheck="false" value="${esc(draft.name)}" placeholder="שם פרטי" />
+      <div class="field-label" id="name-label">מה השם שלך? <small>(לא חובה – אפשר לדלג)</small></div>
+      <div class="name-row">
+        <div class="name-box${draft.name ? '' : ' empty'}" id="kid-name" aria-labelledby="name-label" aria-live="polite">${draft.name ? esc(draft.name) : 'בלי שם'}</div>
+        ${btn('nm-toggle', namePadOpen ? 'סגירה' : (draft.name ? 'עריכת השם' : 'הוספת שם'), 'btn btn-sm')}
+      </div>
+      ${namePadOpen ? `<div class="letters" role="group" aria-label="אותיות">${LETTERS.map((l) => `<button type="button" class="lt" data-act="nm" data-l="${l}">${l}</button>`).join('')}<button type="button" class="lt lt-wide" data-act="nm-space">רווח</button><button type="button" class="lt lt-wide" data-act="nm-del" aria-label="מחיקת אות">⌫ מחיקה</button></div>` : ''}
       <div class="field-label">איך האפליקציה תיראה?</div>
       <div class="theme-opts" role="group" aria-label="בחירת עיצוב">${THEMES.map(opt).join('')}</div>
       <p class="field-hint">השם והעיצוב נשמרים רק במכשיר הזה. אפשר לשנות אותם בכל זמן${edit ? ', וההתקדמות נשארת כמו שהיא' : ''}.</p>
@@ -488,7 +528,7 @@ function examView(): string {
     if (part.kind === 'number' || part.kind === 'text') {
       h += `<div class="num-form">${answerBox(part, `data-exam-input="${pi}"`, val)}</div>`;
     } else if (part.kind === 'fields') {
-      h += fieldRows(part, splitFields(val, part.fields!.length), (i) => `data-exam-field="${pi}:${i}"`) + (part.fieldHint ? `<div class="field-hint">${part.fieldHint}</div>` : '');
+      h += fieldRows(part, splitFields(val, part.fields!.length), `E|${e.index}|${pi}`) + (part.fieldHint ? `<div class="field-hint">${part.fieldHint}</div>` : '');
     } else {
       h += `<div class="${choiceGridClass(q, pi)}" role="group" aria-label="אפשרויות תשובה">` + part.choices!.map((c) =>
         `<button type="button" class="choice${val === c.id ? ' selected' : ''}" aria-pressed="${val === c.id}" data-act="exam-choose" data-part="${pi}" data-choice="${c.id}"><span class="choice-body">${c.html}</span>${val === c.id ? '<span class="mark">● נבחר</span>' : ''}</button>`).join('') + `</div>`;
@@ -608,13 +648,14 @@ function onClick(ev: Event) {
     case 'back-to-results': go({ name: 'examResults' }); break;
     case 'choose': answer(el.dataset.key!, Number(el.dataset.part), el.dataset.choice!); break;
     case 'bay': openBay(el); break;
+    case 'fbox': activeBox.set(el.dataset.group!, Number(el.dataset.i)); render(); break;
+    case 'kp': case 'kp-del': case 'kp-next': padPress(el.dataset.group!, act, el.dataset.d ?? ''); break;
+    case 'nm': case 'nm-del': case 'nm-space': case 'nm-toggle': namePress(act, el.dataset.l ?? ''); break;
     case 'settings':
       draft = { name: state.profile?.name ?? '', theme: state.profile?.theme ?? 'club' };
       go({ name: 'welcome', edit: true, back: { name: 'home' } });
       break;
     case 'pick-theme': {
-      const inp = root.querySelector<HTMLInputElement>('#kid-name');
-      if (inp) draft.name = inp.value;
       draft.theme = el.dataset.themeId as ThemeId;
       render();
       break;
@@ -658,14 +699,15 @@ function onSubmit(ev: Event) {
   const wf = (ev.target as HTMLElement).closest<HTMLFormElement>('form[data-form="welcome"]');
   if (wf) {
     ev.preventDefault();
-    draft.name = wf.querySelector<HTMLInputElement>('#kid-name')!.value;
     saveProfile(true);
     return;
   }
   const ff = (ev.target as HTMLElement).closest<HTMLFormElement>('form.fields-form');
   if (ff) {
     ev.preventDefault();
-    const vals = [...ff.querySelectorAll<HTMLInputElement>('input[data-field]')].map((i) => i.value.trim());
+    const key = ff.dataset.key!, pi = Number(ff.dataset.part);
+    const r = runnerFor(key);
+    const vals = r?.prog[pi].values ?? r?.q.parts[pi].fields!.map(() => '') ?? [];
     answer(ff.dataset.key!, Number(ff.dataset.part), vals.join('|'));
     return;
   }
@@ -678,7 +720,6 @@ function onSubmit(ev: Event) {
 
 function onInput(ev: Event) {
   const t = ev.target as HTMLInputElement;
-  if (t.id === 'kid-name') { draft.name = t.value; return; }
   if (t.dataset.numeric) {
     // numeric boxes keep digits only (the numeric keyboard may still allow other characters)
     const clean = t.value.replace(/[^\d]/g, '');
@@ -715,6 +756,54 @@ function onInput(ev: Event) {
 function splitKey(s: string): [string, number, number] {
   const m = s.match(/^(.*)-(\d+)-(\d+)$/)!;
   return [m[1], Number(m[2]), Number(m[3])];
+}
+
+/** values of a decomposition group: P|<runner key>|<part> (practice / lesson) or E|<question>|<part> (exam) */
+function groupValues(group: string): { vals: string[]; n: number; store: (v: string[]) => void } | null {
+  const [kind, a, b] = group.split('|');
+  if (kind === 'P') {
+    const r = runnerFor(a);
+    if (!r) return null;
+    const part = r.q.parts[Number(b)], pp = r.prog[Number(b)];
+    if (pp.status !== 'open') return null;
+    const n = part.fields!.length;
+    const vals = pp.values ?? Array(n).fill('');
+    return { vals, n, store: (v) => { pp.values = v; } };
+  }
+  const e = state.exam;
+  if (!e) return null;
+  const qi = Number(a), pi = Number(b);
+  const n = e.questions[qi].parts[pi].fields!.length;
+  return { vals: splitFields(e.answers[qi][pi], n), n, store: (v) => { e.answers[qi][pi] = v.join('|'); } };
+}
+
+function padPress(group: string, act: string, d: string) {
+  const g = groupValues(group);
+  if (!g) return;
+  const i = activeIndex(group, g.vals, g.n);
+  const vals = g.vals.slice();
+  if (act === 'kp') {
+    vals[i] = d;
+    activeBox.set(group, Math.min(i + 1, g.n - 1));
+  } else if (act === 'kp-del') {
+    vals[i] = '';
+  } else {
+    activeBox.set(group, (i + 1) % g.n);
+  }
+  g.store(vals);
+  save();
+  render();
+}
+
+/* name without the phone keyboard: a small Hebrew letter pad */
+let namePadOpen = false;
+const LETTERS = 'אבגדהוזחטיכךלמםנןסעפףצץקרשת'.split('');
+function namePress(act: string, l: string) {
+  if (act === 'nm-toggle') namePadOpen = !namePadOpen;
+  else if (act === 'nm-del') draft.name = draft.name.slice(0, -1);
+  else if (act === 'nm-space') { if (draft.name && !draft.name.endsWith(' ') && draft.name.length < 16) draft.name += ' '; }
+  else if (draft.name.length < 16) draft.name += l;
+  render();
 }
 
 function openBay(el: HTMLElement) {

@@ -3,6 +3,7 @@
  * ושאלת "עכשיו תורך" עם נתונים אחרים, שבודקת בדיוק את אותה מיומנות.
  */
 import type { Question, TopicId, Part } from './types';
+import { numbersToChoices } from './choices';
 import { m, X, D, MINUS, BLANK, mathChoice, textChoice } from './format';
 import { numberLine, sequenceFigure, groupsFigure, angleFigure, polygonFigure, triangleFigure } from './figures';
 import { drawers as cargoBays, bowlGroups } from './club';
@@ -403,7 +404,8 @@ export function buildLessons(): Record<TopicId, Lesson> {
 
 let cache: Record<TopicId, Lesson> | null = null;
 export function getLesson(t: TopicId): Lesson {
-  cache = cache ?? buildLessons();
+  // no typing: number answers of "עכשיו תורך" become answer buttons too
+  cache = cache ?? Object.fromEntries(Object.entries(buildLessons()).map(([k, l]) => [k, { ...l, skills: l.skills.map((s) => ({ ...s, tryIt: numbersToChoices(s.tryIt) })) }])) as Record<TopicId, Lesson>;
   return cache[t];
 }
 

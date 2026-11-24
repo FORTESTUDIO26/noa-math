@@ -40,6 +40,26 @@ const noHScroll = async (where) => {
 const shot = (name) => page.screenshot({ path: path.join(shots, name + '.png'), fullPage: true });
 const text = (sel) => page.locator(sel).first().innerText();
 
+/** fill decomposition boxes with the on-screen digit pad (no phone keyboard) */
+async function fillBoxes(pg, group, values) {
+  for (let i = 0; i < values.length; i++) {
+    await pg.click(`[data-field="${group}-${i}"]`);
+    if (values[i] === '') await pg.click(`[data-act=kp-del][data-group="${group}"]`);
+    else await pg.click(`[data-act=kp][data-group="${group}"][data-d="${values[i]}"]`);
+  }
+}
+const boxValue = (pg, group, i) => pg.locator(`[data-field="${group}-${i}"]`).innerText().then((t) => t.trim());
+/** type a name with the on-screen letter pad */
+async function typeName(pg, name) {
+  if ((await pg.locator('[data-act=nm]').count()) === 0) await pg.click('[data-act=nm-toggle]');
+  while ((await pg.locator('#kid-name').innerText()) !== 'בלי שם' && (await pg.locator('#kid-name').innerText()).length) {
+    if ((await pg.locator('.name-box.empty').count()) === 1) break;
+    await pg.click('[data-act=nm-del]');
+  }
+  for (const ch of name) await pg.click(ch === ' ' ? '[data-act=nm-space]' : `[data-act=nm][data-l="${ch}"]`);
+}
+const noKeyboardInputs = (pg) => pg.locator('main input, main textarea, main [contenteditable]').count();
+
 /** answer the current practice question; mode: 'right' | 'wrongThenRight' | 'wrongTwice' */
 async function answerPractice(mode = 'right') {
   const s = await state();
@@ -55,10 +75,7 @@ async function answerPractice(mode = 'right') {
         await page.fill(`[data-input="P-${pi}"]`, v);
         await page.click(`form[data-key="P"][data-part="${pi}"] button[type=submit]`);
       } else if (part.kind === 'fields') {
-        for (let i = 0; i < part.fields.length; i++) {
-          const a = part.fields[i].answer;
-          await page.fill(`[data-field="P-${pi}-${i}"]`, t === 'R' ? a : i === 0 ? String((Number(a) + 1) % 10) : a);
-        }
+        await fillBoxes(page, `P|P|${pi}`, part.fields.map((f, i) => (t === 'R' || i > 0 ? f.answer : String((Number(f.answer) + 1) % 10))));
         await page.click(`form.fields-form[data-key="P"][data-part="${pi}"] button[type=submit]`);
       } else {
         const id = t === 'R' ? part.answer : await page.locator(`[data-act=choose][data-key=P][data-part="${pi}"]:not([disabled])`).evaluateAll((els, ans) => els.map((e) => e.dataset.choice).find((c) => c !== ans), part.answer);
@@ -82,10 +99,11 @@ try {
   const themeNames = (await page.locator('.theme-name b').allInnerTexts()).join(',');
   check('two looks offered: מועדון החיות, כדורגל בחלל', themeNames === 'מועדון החיות,כדורגל בחלל', themeNames);
   check('each look has a small picture', (await page.locator('.theme-thumb .scene-svg').count()) === 2);
-  check('name box uses the regular keyboard', (await page.locator('#kid-name').getAttribute('inputmode')) === 'text');
+  check('welcome: no text box that needs the phone keyboard', (await noKeyboardInputs(page)) === 0);
   await noHScroll('welcome');
   await shot('00-welcome');
-  await page.fill('#kid-name', '  אורי ');
+  await typeName(page, 'אורי');
+  check('name typed with the on-screen letters', (await page.locator('#kid-name').innerText()) === 'אורי');
   await page.click('form[data-form=welcome] button[type=submit]');
   check('home greets by name: "היי, אורי!" under the app name', (await text('.greet')) === 'היי, אורי!' && (await text('h1')) === 'המתמטיקה של נועה');
   check('default look is מועדון החיות', (await page.evaluate(() => document.documentElement.dataset.theme)) === 'club');
@@ -181,21 +199,24 @@ try {
   {
     const s = await state();
     const q = s.practice.questions[0];
-    await page.fill('[data-input="P-0"]', String(Number(q.parts[0].answer) + 1));
-    await page.click('form[data-key="P"] button[type=submit]');
+    const p0 = q.parts[0];
+    check('number answer is shown as 4 buttons (no typing)', p0.kind === 'choice' && (await page.locator('[data-act=choose][data-key=P]').count()) === 4 && (await noKeyboardInputs(page)) === 0);
+    const nums = (await page.locator('[data-act=choose][data-key=P]').allInnerTexts()).map((x) => Number(x.replace(/[^0-9]/g, '')));
+    check('number buttons go from small to big', nums.every((x, i) => i === 0 || x > nums[i - 1]), nums.join(','));
+    const wrongId = p0.choices.find((c) => c.id !== p0.answer).id;
+    await page.click(`[data-act=choose][data-key=P][data-choice="${wrongId}"]`);
     const h = await text('.hint');
     check('number line hint: "בודקים בכמה המספרים גדלים בין שתי שנתות"', h.includes('בודקים בכמה המספרים גדלים בין שתי שנתות'), h);
-    check('can try again after hint', (await page.locator('[data-input="P-0"]').count()) === 1);
-    await page.fill('[data-input="P-0"]', Number(q.parts[0].answer).toLocaleString('en-US')); // with thousands comma too
-    await page.click('form[data-key="P"] button[type=submit]');
-    check('correct answer accepted (2nd try)', (await page.locator('.num-result.correct').count()) === 1);
+    check('can try again after hint (wrong button marked, others still open)', (await page.locator('[data-act=choose][data-key=P]:not([disabled])').count()) === 3);
+    await page.click(`[data-act=choose][data-key=P][data-choice="${p0.answer}"]`);
+    check('correct answer accepted (2nd try)', (await page.locator('.choice.right').count()) === 1);
     await shot('04-after-hint-correct');
     await page.click('[data-act=next-q]');
   }
   // Q2: wrong twice → explained solution
   await answerPractice('wrongTwice');
   check('explained solution after 2nd mistake', (await page.locator('.explain').count()) === 1 && (await text('.explain')).includes('פתרון מוסבר'));
-  check('correct answer shown after 2nd mistake', (await page.locator('.num-result.failed').count()) >= 1);
+  check('correct answer shown after 2nd mistake', (await page.locator('.choice.right, .frow-ok, .frow-bad').count()) >= 1);
   await shot('05-explained-solution');
   await page.click('[data-act=next-q]');
   // Q3: open lesson and come back to the same question
@@ -289,10 +310,7 @@ try {
         const right = part.kind === 'text' ? part.accept[0] : part.answer;
         await page.fill(`[data-exam-input="${pi}"]`, makeWrong ? (part.kind === 'text' ? 'לא' : String(Number(part.answer) + 1)) : right);
       } else if (part.kind === 'fields') {
-        for (let i = 0; i < part.fields.length; i++) {
-          const a = part.fields[i].answer;
-          await page.fill(`[data-exam-field="${pi}:${i}"]`, makeWrong && i === 0 ? String((Number(a) + 1) % 10) : a);
-        }
+        await fillBoxes(page, `E|${i}|${pi}`, part.fields.map((f, k) => (makeWrong && k === 0 ? String((Number(f.answer) + 1) % 10) : f.answer)));
       } else {
         const id = makeWrong ? part.choices.find((c) => c.id !== part.answer).id : part.answer;
         await page.click(`[data-act=exam-choose][data-part="${pi}"][data-choice="${id}"]`);
@@ -309,12 +327,14 @@ try {
   check('exam question 1 is the 4-box decomposition', q0.parts[0].kind === 'fields');
   {
     const f = q0.parts[0].fields;
-    check('previous answers kept in all four boxes', (await Promise.all(f.map((_, i) => page.inputValue(`[data-exam-field="0:${i}"]`)))).join('|') === f.map((x) => x.answer).join('|'));
-    await page.fill('[data-exam-field="0:2"]', '');
+    check('previous answers kept in all four boxes', (await Promise.all(f.map((_, i) => boxValue(page, 'E|0|0', i)))).join('|') === f.map((x) => x.answer).join('|'));
+    await page.click('[data-field="E|0|0-2"]');
+    await page.click('[data-act=kp-del][data-group="E|0|0"]');
     await page.reload();
-    check('exam boxes saved after refresh (one emptied)', (await page.inputValue('[data-exam-field="0:2"]')) === '' && (await page.inputValue('[data-exam-field="0:0"]')) === f[0].answer);
+    check('exam boxes saved after refresh (one emptied)', (await boxValue(page, 'E|0|0', 2)) === '' && (await boxValue(page, 'E|0|0', 0)) === f[0].answer);
     check('question chip shows "not answered" while a box is empty', !(await page.locator('.qchip[data-i="0"]').getAttribute('class')).includes('answered'));
-    await page.fill('[data-exam-field="0:2"]', f[2].answer);
+    await page.click('[data-field="E|0|0-2"]');
+    await page.click(`[data-act=kp][data-group="E|0|0"][data-d="${f[2].answer}"]`);
     check('chip is "answered" again', (await page.locator('.qchip[data-i="0"]').getAttribute('class')).includes('answered'));
   }
   await page.click('.submit-row [data-act=exam-submit], .exam-buttons [data-act=exam-submit]');
@@ -379,26 +399,27 @@ try {
     await page.click('[data-act=open-topic][data-topic=placeValue]');
     await page.click('.ex [data-act=lesson-step]');
     const fr = '[data-runner="L:placeValue:0"]';
+    const G = 'P|L:placeValue:0|0';
     const rows = await page.evaluate((fr) => [...document.querySelectorAll(`${fr} .frow`)].map((r) => {
-      const i = r.querySelector('input').getBoundingClientRect(), l = r.querySelector('.flabel').getBoundingClientRect();
-      return { label: r.querySelector('.flabel').textContent, inputRight: i.x > l.x, im: r.querySelector('input').getAttribute('inputmode') };
+      const i = r.querySelector('.fbox').getBoundingClientRect(), l = r.querySelector('.flabel').getBoundingClientRect();
+      return { label: r.querySelector('.flabel').textContent, inputRight: i.x > l.x };
     }), fr);
     check('4 rows אלפים/מאות/עשרות/יחידות', rows.map((r) => r.label).join(',') === 'אלפים,מאות,עשרות,יחידות');
     check('box comes before the word in Hebrew reading order (box on the right)', rows.every((r) => r.inputRight));
-    check('decomposition boxes open the numeric keyboard', rows.every((r) => r.im === 'numeric'));
-    await page.fill('[data-field="L:placeValue:0-0-0"]', '7');
-    await page.fill('[data-field="L:placeValue:0-0-2"]', '6'); // wrong (5)
-    await page.fill('[data-field="L:placeValue:0-0-3"]', '2');
+    check('boxes are filled with the on-screen digit pad – no phone keyboard', (await page.locator(`${fr} .keypad .kp`).count()) === 12 && (await noKeyboardInputs(page)) === 0);
+    await fillBoxes(page, G, ['7', '', '6', '2']); // hundreds empty, tens wrong (5)
     await page.click(`${fr} form.fields-form button[type=submit]`);
     const st = await page.evaluate((fr) => [...document.querySelectorAll(`${fr} .frow`)].map((r) => r.className + '|' + (r.querySelector('.fmark')?.textContent ?? '')), fr);
     check('empty hundreds row: "השורה ריקה"; wrong tens row: "לתיקון"; others unmarked', st[1].includes('frow-empty') && st[1].includes('השורה ריקה') && st[2].includes('frow-bad') && st[2].includes('לתיקון') && !st[0].includes('frow-') && !st[3].includes('frow-'), st.join(' / '));
-    check('what Noa typed is kept', (await page.inputValue('[data-field="L:placeValue:0-0-0"]')) === '7' && (await page.inputValue('[data-field="L:placeValue:0-0-3"]')) === '2');
+    check('what was filled is kept', (await boxValue(page, G, 0)) === '7' && (await boxValue(page, G, 3)) === '2');
     const zh = await text(`${fr} .hint`);
     check('zero hint explains why 0 must be written', zh.includes('צריך לכתוב 0') && zh.includes('מאות'), zh);
     check('picture of the boxes not shown before solving', (await page.locator(`${fr} .hint-figure`).count()) === 0);
     await shot('16-fields-zero-hint');
-    await page.fill('[data-field="L:placeValue:0-0-1"]', '0');
-    await page.fill('[data-field="L:placeValue:0-0-2"]', '5');
+    await page.click(`[data-field="${G}-1"]`);
+    await page.click(`[data-act=kp][data-group="${G}"][data-d="0"]`);
+    await page.click(`[data-field="${G}-2"]`);
+    await page.click(`[data-act=kp][data-group="${G}"][data-d="5"]`);
     await page.click(`${fr} form.fields-form button[type=submit]`);
     check('all four boxes accepted with an explicit 0', (await page.locator(`${fr} .good`).count()) === 1);
     const after = await text(`${fr} .after`);
@@ -469,12 +490,12 @@ try {
     const q2 = (await state()).practice.questions[1];
     const p0 = q2.parts[0];
     if (p0.kind === 'choice') await page.click(`[data-act=choose][data-key=P][data-choice="${p0.answer}"]`);
-    else await page.fill('[data-input="P-0"]', p0.answer), await page.click('form[data-key="P"][data-part="0"] button');
+    else await fillBoxes(page, 'P|P|0', p0.fields.map((f) => f.answer)), await page.click('form.fields-form[data-key="P"] button[type=submit]');
     await shot('20-same-question-club');
     const before = await page.locator('.q-card').innerText();
     await page.click('[data-act=home]');
     await page.click('[data-act=settings]');
-    check('settings screen keeps the name', (await page.inputValue('#kid-name')) === 'אורי');
+    check('settings screen keeps the name', (await page.locator('#kid-name').innerText()) === 'אורי');
     await page.click('[data-act=pick-theme][data-theme-id=space]');
     await page.click('form[data-form=welcome] button[type=submit]');
     check('look switched to כדורגל בחלל', (await page.evaluate(() => document.documentElement.dataset.theme)) === 'space');
@@ -492,13 +513,13 @@ try {
     await page.click('[data-act=start-exam]');
     const ex = (await state()).exam;
     const f = ex.questions[0].parts[0].fields;
-    for (let i = 0; i < f.length; i++) await page.fill(`[data-exam-field="0:${i}"]`, f[i].answer);
+    await fillBoxes(page, 'E|0|0', f.map((x) => x.answer));
     await page.click('[data-act=home]');
     await page.click('[data-act=settings]');
     await page.click('[data-act=pick-theme][data-theme-id=club]');
     await page.click('form[data-form=welcome] button[type=submit]');
     await page.click('[data-act=continue-exam]');
-    check('exam answer kept after switching back to מועדון החיות', (await page.inputValue('[data-exam-field="0:0"]')) === f[0].answer && (await page.evaluate(() => document.documentElement.dataset.theme)) === 'club');
+    check('exam answer kept after switching back to מועדון החיות', (await boxValue(page, 'E|0|0', 0)) === f[0].answer && (await page.evaluate(() => document.documentElement.dataset.theme)) === 'club');
     await page.click('[data-act=home]');
   }
 
@@ -511,10 +532,11 @@ try {
     const fits = async (where) => {
       const w = await p2.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
       if (w.sw > w.cw) bad.push(`${where} ${w.sw}/${w.cw}`);
+      if ((await noKeyboardInputs(p2)) > 0) bad.push(`${where}: has a text box`);
     };
     await p2.goto(URL);
     await p2.click('[data-act=pick-theme][data-theme-id=space]');
-    await p2.fill('#kid-name', 'מאיה');
+    await typeName(p2, 'מאיה');
     await p2.click('form[data-form=welcome] button[type=submit]');
     check('390px pass runs in the "כדורגל בחלל" look', (await p2.evaluate(() => document.documentElement.dataset.theme)) === 'space' && (await p2.locator('.scene .astro').count()) >= 3);
     await fits('home');
@@ -536,7 +558,7 @@ try {
         for (let pi = 0; pi < q.parts.length; pi++) {
           const part = q.parts[pi];
           if (part.kind === 'choice') await p2.click(`[data-act=choose][data-key=P][data-part="${pi}"][data-choice="${part.answer}"]`);
-          else if (part.kind === 'fields') { for (let k = 0; k < part.fields.length; k++) await p2.fill(`[data-field="P-${pi}-${k}"]`, part.fields[k].answer); await p2.click(`form.fields-form[data-part="${pi}"] button`); }
+          else if (part.kind === 'fields') { await fillBoxes(p2, `P|P|${pi}`, part.fields.map((f) => f.answer)); await p2.click(`form.fields-form[data-part="${pi}"] button[type=submit]`); }
           else { await p2.fill(`[data-input="P-${pi}"]`, part.answer); await p2.click(`form[data-key="P"][data-part="${pi}"] button`); }
         }
         await fits(`${t} q${i + 1} solved`);
@@ -556,7 +578,7 @@ try {
     await fits('exam results');
     await p2.click('[data-act=review]');
     await fits('exam review');
-    check(`390px, כדורגל בחלל: ${screens} screens (all lesson steps, 13 rounds, exam, results, review) without horizontal scroll`, bad.length === 0, bad.join('; '));
+    check(`390px, כדורגל בחלל: ${screens} screens (all lesson steps, 13 rounds, exam, results, review) – no horizontal scroll, no text box needing the phone keyboard`, bad.length === 0, bad.join('; '));
     await ctx2.close();
   }
 

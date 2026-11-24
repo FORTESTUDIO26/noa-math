@@ -55,6 +55,8 @@ export interface Part {
   zeroHint?: string;
   /** HTML shown once the part is solved (or after the 2nd mistake) */
   after?: string;
+  /** number: typical wrong answers to offer as buttons (see choices.ts) */
+  near?: number[];
   /** choice: options keep a logical order (place names, angle types …), so they are not reshuffled */
   fixedOrder?: boolean;
 }

@@ -48,7 +48,7 @@ export function qFields(topic: TopicId, level: Level, n: number): Question {
     zeroHint: zeroP !== undefined
       ? `ב־${fmt(n)} אין ${placeName(zeroP)}, אבל צריך לכתוב 0 בשורת ה${placeName(zeroP)}. ה־0 שומר על המקום, כדי שכל ספרה תישאר במקום שלה.`
       : undefined,
-    fieldHint: 'כותבים ספרה אחת בכל שורה',
+    fieldHint: 'בוחרים ספרה אחת לכל שורה בכפתורי הספרות',
     after: `הפירוק לפי ערכים: ${m(`${fmt(n)} = ${valuesSum(n)}`)}`,
   };
   return {

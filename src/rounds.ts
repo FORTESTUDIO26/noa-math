@@ -5,6 +5,7 @@ import { generate } from './generators';
 import { validateQuestion } from './validate';
 import { TOPICS } from './topics';
 import { checkPart } from './answers';
+import { numbersToChoices } from './choices';
 import { familyRound, placeQuestion, fixedPositionClash, type PlaceType } from './generators/place';
 
 export interface TopicStats { seen: number; firstTry: number; wrong: number }
@@ -15,7 +16,7 @@ export function freshQuestion(rng: Rng, topic: TopicId, level: Level, avoid: Set
   let fallback: Question | null = null;
   for (let i = 0; i < 40; i++) {
     let q: Question;
-    try { q = generate(topic, rng, level); } catch { continue; }
+    try { q = numbersToChoices(generate(topic, rng, level)); } catch { continue; }
     if (validateQuestion(q).length) continue;
     fallback = fallback ?? q;
     if (!avoid.has(q.sig)) { avoid.add(q.sig); return q; }
@@ -29,9 +30,10 @@ export function buildTopicRound(rng: Rng, topic: TopicId, recent: string[]): Que
   if (topic === 'placeValue' || topic === 'digitValue') {
     // one round = two numbers, each met in several forms
     let best: Question[] = [];
-    for (let i = 0; i < 20; i++) {
-      const qs = familyRound(rng, topic);
+    for (let i = 0; i < 80; i++) {
+      const qs = familyRound(rng, topic).map(numbersToChoices);
       if (qs.some((q) => validateQuestion(q).length)) continue;
+      if (fixedPositionClash(qs) && i < 79) continue; // number buttons are in a fixed order too
       best = qs;
       if (!qs.some((q) => avoid.has(q.sig))) break;
     }
@@ -137,7 +139,7 @@ export function buildExam(rng: Rng, recent: string[]): Question[] {
   const make = (i: number) => {
     const [t, lv, type] = EXAM_PLAN[i];
     if (!type) return freshQuestion(rng, t, lv, avoid);
-    const q = placeQuestion(rng, t, lv, type);
+    const q = numbersToChoices(placeQuestion(rng, t, lv, type));
     avoid.add(q.sig);
     return q;
   };

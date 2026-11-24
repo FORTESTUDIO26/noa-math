@@ -41,7 +41,7 @@ export function prevNext(rng: Rng, level: Level): Question {
   return {
     topic, level, sig: `pn-${isNext ? 'n' : 'p'}-${n}`,
     prompt: isNext ? `מה המספר <b>העוקב</b> של <b>${fmt(n)}</b>?` : `מה המספר <b>הקודם</b> של <b>${fmt(n)}</b>?`,
-    parts: [num(ans, isNext ? 'המספר העוקב גדול ב־1. מוסיפים 1 – ושימו לב למעבר עשרת או מאה.' : 'המספר הקודם קטן ב־1. מורידים 1 – ושימו לב למעבר עשרת או מאה.')],
+    parts: [num(ans, isNext ? 'המספר העוקב גדול ב־1. מוסיפים 1 – ושימו לב למעבר עשרת או מאה.' : 'המספר הקודם קטן ב־1. מורידים 1 – ושימו לב למעבר עשרת או מאה.', { near: [n, isNext ? n - 1 : n + 1, isNext ? n + 10 : n - 10] })],
     explanation: isNext
       ? `העוקב גדול ב־1: ${m(`${fmt(n)} + 1 = ${fmt(ans)}`)}.`
       : `הקודם קטן ב־1: ${m(`${fmt(n)} ${MINUS} 1 = ${fmt(ans)}`)}.`,
@@ -120,7 +120,7 @@ export function multDiv(rng: Rng, level: Level): Question {
         topic, level, sig: `md-m-${p}x${q}`,
         prompt: 'יש לפתור את התרגיל.',
         math: `${p} ${X} ${q} = ${BLANK}`,
-        parts: [num(p * q, `נעזרים בתרגיל שאת יודעת: ${p} ${X} ${q - 1} = ${p * (q - 1)}. כמה צריך להוסיף?`)],
+        parts: [num(p * q, `נעזרים בתרגיל מוכר: ${p} ${X} ${q - 1} = ${p * (q - 1)}. כמה צריך להוסיף?`)],
         explanation: `${m(`${p} ${X} ${q - 1} = ${p * (q - 1)}`)}, ועוד ${p} אחד: ${m(`${p * (q - 1)} + ${p} = ${p * q}`)}. לכן ${m(`${p} ${X} ${q} = ${p * q}`)}.`,
       };
     }
@@ -279,7 +279,7 @@ export function numberLineQ(rng: Rng, level: Level): Question {
     figure: numberLine({ start, step, count, labeled, unknown }),
     parts: [num(ans, jumps === 1
       ? 'בודקים בכמה המספרים גדלים בין שתי שנתות.'
-      : `בין ${fmt(val(i0))} ל־${fmt(val(i1))} יש ${jumps} קפיצות. בכמה גדל המספר בכל קפיצה?`)],
+      : `בין ${fmt(val(i0))} ל־${fmt(val(i1))} יש ${jumps} קפיצות. בכמה גדל המספר בכל קפיצה?`, { near: [ans + step, ans - step, ans + (val(i1) - val(i0))] })],
     explanation: `בין ${m(fmt(val(i0)))} ל־${m(fmt(val(i1)))} יש ${jumps === 1 ? 'קפיצה אחת' : `${jumps} קפיצות`}: ${jumps === 1 ? m(`${fmt(val(i1))} ${MINUS} ${fmt(val(i0))} = ${fmt(step)}`) : m(`(${fmt(val(i1))} ${MINUS} ${fmt(val(i0))}) ${D} ${jumps} = ${fmt(step)}`)}, כלומר כל קפיצה היא ${m(fmt(step))}. ` +
       (dist >= 0
         ? `סימן השאלה נמצא ${dist} קפיצות אחרי ${m(fmt(val(i0)))}: ${m(`${fmt(val(i0))} + ${dist} ${X} ${fmt(step)} = ${fmt(ans)}`)}.`
@@ -308,7 +308,7 @@ export function sequences(rng: Rng, level: Level): Question {
     topic, level, sig: `sq-${terms.join('_')}-${blank}`,
     prompt: `יש להשלים את המספר החסר בסדרה ה${up ? 'עולה' : 'יורדת'}.`,
     figure: sequenceFigure(terms, blank),
-    parts: [num(ans, `בודקים בכמה המספרים ${up ? 'גדלים' : 'קטנים'}: מ־${fmt(terms[ref])} ל־${fmt(terms[ref + 1 === blank ? ref + 2 : ref + 1])}.`)],
+    parts: [num(ans, `בודקים בכמה המספרים ${up ? 'גדלים' : 'קטנים'}: מ־${fmt(terms[ref])} ל־${fmt(terms[ref + 1 === blank ? ref + 2 : ref + 1])}.`, { near: [ans + step, ans - step, ans + 2 * step] })],
     explanation: `בכל צעד המספר ${up ? 'גדל' : 'קטן'} ב־${m(fmt(step))}. ` +
       (blank === 0
         ? `המספר הראשון ${up ? 'קטן' : 'גדול'} ב־${fmt(step)} מ־${m(fmt(terms[1]))}: ${m(`${fmt(terms[1])} ${up ? MINUS : '+'} ${fmt(step)} = ${fmt(ans)}`)}.`

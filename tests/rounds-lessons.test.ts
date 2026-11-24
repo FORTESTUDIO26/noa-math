@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Rng } from '../src/rng';
+import { GENERATORS } from '../src/generators';
 import { TOPICS } from '../src/topics';
 import { buildExam, buildMixed, buildTopicRound, isCorrectAnswer, EXAM_PLAN } from '../src/rounds';
 import { buildLessons } from '../src/lessons';
@@ -56,7 +57,7 @@ describe('rounds', () => {
   });
 
   it('answers are checked leniently for numbers (commas, spaces, leading zeros)', () => {
-    const q = buildTopicRound(new Rng(5), 'prevNext', [])[5];
+    const q = GENERATORS.prevNext(new Rng(5), 3); // the checker still accepts typed numbers from older saved rounds
     const ans = q.parts[0].answer;
     expect(isCorrectAnswer(q, 0, ans)).toBe(true);
     expect(isCorrectAnswer(q, 0, Number(ans).toLocaleString('en-US'))).toBe(true);
@@ -135,5 +136,43 @@ describe('"איך עושים את זה?" cards', () => {
     expect(s.example.answer).toContain('7,000 + 600 + 30 + 9');
     expect(s.tryIt.parts[0].kind).toBe('fields');
     expect(s.tryIt.parts[0].answer).toBe('7|0|5|2');
+  });
+});
+
+import { numbersToChoices } from '../src/choices';
+import { getLesson } from '../src/lessons';
+
+describe('no typing at all', () => {
+  it('rounds, mixed rounds, exams and lessons only ask to tap', () => {
+    const rng = new Rng(21);
+    const all: import('../src/types').Question[] = [];
+    for (const t of TOPICS) for (let r = 0; r < 6; r++) all.push(...buildTopicRound(rng, t.id, []));
+    for (let r = 0; r < 20; r++) all.push(...buildMixed(rng, {}, []), ...buildExam(rng, []));
+    for (const t of TOPICS) for (const s of getLesson(t.id).skills) all.push(s.tryIt);
+    for (const q of all) for (const p of q.parts) expect(['choice', 'fields'], q.sig).toContain(p.kind);
+  });
+
+  it('number buttons: 4 different whole numbers ≥ 0, ascending, exactly one right', () => {
+    const rng = new Rng(8);
+    for (const t of TOPICS) for (const lv of [1, 2, 3] as const) for (let i = 0; i < 80; i++) {
+      const raw = GENERATORS[t.id](rng, lv);
+      const q = numbersToChoices(raw);
+      raw.parts.forEach((p, pi) => {
+        if (p.kind !== 'number') return;
+        const c = q.parts[pi];
+        const nums = c.choices!.map((x) => Number(x.text.replace(/,/g, '')));
+        expect(nums.length, raw.sig).toBe(4);
+        expect(new Set(nums).size, raw.sig).toBe(4);
+        expect(nums.every((x) => Number.isInteger(x) && x >= 0)).toBe(true);
+        expect(nums).toEqual([...nums].sort((a, b) => a - b));
+        expect(c.choices!.find((x) => x.id === c.answer)!.text.replace(/,/g, '')).toBe(p.answer);
+        expect(validateQuestion(q)).toEqual([]);
+      });
+    }
+  });
+
+  it('the same question always gets the same buttons (safe after a refresh)', () => {
+    const raw = GENERATORS.multDiv(new Rng(3), 2);
+    expect(JSON.stringify(numbersToChoices(raw))).toBe(JSON.stringify(numbersToChoices(raw)));
   });
 });

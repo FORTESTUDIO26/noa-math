@@ -146,10 +146,10 @@ describe('several forms of the same number', () => {
         expect(Math.max(...counts.values())).toBeGreaterThanOrEqual(2);
         // no question is right after another question about the same number
         for (let i = 1; i < nums.length; i++) if (nums[i] > 0) expect(nums[i], qs.map((q) => q.sig).join(' ')).not.toBe(nums[i - 1]);
-        // both typed numbers / boxes and choice questions
+        // nothing to type: only answer buttons (and the 4-box decomposition with its digit pad)
         const kinds = new Set(qs.flatMap((q) => q.parts.map((p) => p.kind)));
         expect(kinds.has('choice')).toBe(true);
-        expect([...kinds].some((k) => k !== 'choice')).toBe(true);
+        expect([...kinds].every((k) => k === 'choice' || k === 'fields')).toBe(true);
       }
       expect(seenNumbers.size).toBeGreaterThan(200); // numbers change between rounds
     });
@@ -160,7 +160,7 @@ describe('several forms of the same number', () => {
     expect(qs[0].parts[0].kind).toBe('choice');
     expect(qs[0].sig).toContain('dv-place');
     expect(qs[4].sig).toContain('dv-value');
-    expect(qs[3].parts[0].kind).toBe('number');
+    expect(qs[3].parts[0].kind).toBe('choice'); // was a typed number – now 4 number buttons
     expect(qs[0].sig.split('-').slice(2).join('-')).toBe(qs[4].sig.split('-').slice(2).join('-'));
     expect(qs[2].parts[0].choices!.length).toBe(4);
   });
